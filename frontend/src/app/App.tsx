@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getHealth, type HealthResponse } from '../shared/api/health';
+import SafetyAdminPanel from '../features/safety-admin/SafetyAdminPanel';
 
 type Check = { state: 'idle' | 'loading' | 'done' | 'error'; data?: HealthResponse };
 const modules = [
@@ -65,6 +66,7 @@ export default function App() {
           </article>)}</div>
       </section>
       <section className="next-step"><span className="next-marker">TIẾP THEO</span><div><h2>Đăng ký và đăng nhập</h2><p>Chốt DTO, quyền và bảng người dùng trước khi phát triển các chức năng phụ thuộc. Bộ khung hiện chưa có tài khoản, match hoặc chat thật.</p></div></section>
+      <SafetyAdminPanel />
     </main><footer className="container app-width">Đọc README.md để chạy dự án · docs/PHAN_CONG.md để nhận việc · docs/GIT_WORKFLOW.md để gửi PR</footer>
   </>;
 }

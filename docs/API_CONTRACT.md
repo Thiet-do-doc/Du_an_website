@@ -15,7 +15,21 @@ Ví dụ body health:
 Thời gian trên là ví dụ; server trả thời gian hiện tại khi chạy.
 
 Chưa có Swagger UI. Có thể import URL OpenAPI vào Postman hoặc mở các GET trực tiếp.
-Không có API auth/profile/match/chat giả. Các endpoint đó được thêm trong sprint sau.
+Profile/match/chat chưa có API; auth và SafetyAdmin được ghi ở phần dưới.
+
+## SafetyAdmin
+
+| Phương thức | Đường dẫn | Quyền / dữ liệu |
+|---|---|---|
+| POST / DELETE | `/api/v1/blocks/{targetUserId}` | Người dùng đã đăng nhập; block hai chiều được kiểm tra qua `IBlockPolicy` |
+| POST | `/api/v1/reports` | Người dùng đã đăng nhập; `targetType`, `targetId`, `reason`, `description` |
+| GET | `/api/v1/admin/reports` | Role `Admin`; lọc `status`, `page`, `pageSize` |
+| GET / PATCH | `/api/v1/admin/reports/{id}` | Role `Admin`; cập nhật status kèm ghi chú xử lý |
+| PATCH | `/api/v1/admin/users/{id}/status` | Role `Admin`; body `{ "isActive": false, "reason": "..." }` |
+
+Enum JSON dùng tên chuỗi. Report User hoạt động; report Message/Post trả 501 cho
+đến khi TV4/TV2 cung cấp kiểm tra đối tượng và quyền. Admin report không trả nội
+dung chat. TV1 cần cấu hình role `Admin` trong Auth.
 
 Quy ước: camelCase cho JSON, UTC cho thời gian, UUID cho định danh; DTO không trả
 password hash, token bí mật hoặc ngày sinh của người khác. API nghiệp vụ sẽ dùng
