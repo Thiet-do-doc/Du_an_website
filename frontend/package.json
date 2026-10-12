@@ -10,12 +10,14 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:tv4": "node scripts/tv4-smoke.mjs"
   },
   "dependencies": {
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "bootstrap": "5.3.8"
+    "bootstrap": "5.3.8",
+    "@microsoft/signalr": "^10.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",

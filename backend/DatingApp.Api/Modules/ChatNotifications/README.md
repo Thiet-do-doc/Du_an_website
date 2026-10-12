@@ -1,18 +1,7 @@
-# ChatNotifications
-- Chủ trì: **TV4**. Dự phòng: **TV5**.
-- Phạm vi: SignalR, lịch sử chat, chống gửi trùng, reconnect và thông báo.
-- Bảng dự kiến: Conversations, Messages, Notifications.
-- Frontend tương ứng: `frontend/src/features/chat-notifications/`.
+# ChatNotifications — TV4
 
-Đây là chỗ phát triển tiếp, chưa có endpoint nghiệp vụ.
+Đã có code cho ChatHub, Conversations/Messages/Notifications, DTOs, services, keyset pagination, tests và frontend tương ứng. Đây là bản **demo local** dùng `DemoChatPermissions` (cùng DbContext) để kiểm thử độc lập khi Auth, Match, Block thật của nhóm chưa hoàn thành.
 
-## Đầu việc đầu tiên
-1. Chốt request/response DTO và quy tắc quyền với thành viên liên quan.
-2. Tạo entity, cấu hình EF Core và migration có review khi đã chốt schema.
-3. Xây service xử lý nghiệp vụ; controller chỉ nhận, kiểm tra và trả HTTP.
-4. Nối giao diện React với API thật, có loading/error/empty.
-5. Thêm kiểm thử sai quyền và quy tắc quan trọng; gửi PR cho người khác review.
+**Để chạy** đọc `README_TV4_VISUAL_STUDIO.md` ở gốc repo. API thuộc `/api/v1/conversations`, `/api/v1/notifications`; Hub `/hubs/chat`. Không cho phép production dùng Demo* hoặc `/api/v1/dev/*`.
 
-Không tạo bảng hoặc API trùng với module khác. Không phát triển trước Auth
-bằng cách cho phép mọi người thao tác dữ liệu. Trao đổi API qua `Shared/Contracts`
-và service nếu cần thay đổi dữ liệu thuộc module khác.
+Tạo migration sau khi phối hợp TV1 để tránh xung đột migration trên cùng AppDbContext. Xem thêm `docs/TV4_API_VA_TICH_HOP.md`.

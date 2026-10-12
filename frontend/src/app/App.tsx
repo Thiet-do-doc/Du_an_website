@@ -1,3 +1,5 @@
+import TV4DemoPage from '../features/chat-notifications/pages/TV4DemoPage';
+import '../features/chat-notifications/chat.css';
 import { useState } from 'react';
 import { getHealth, type HealthResponse } from '../shared/api/health';
 
@@ -10,7 +12,7 @@ const modules = [
   ['05', 'An toàn & quản trị', 'TV5', 'SafetyAdmin', 'TV1'],
 ];
 
-export default function App() {
+function HomeApp() {
   const [api, setApi] = useState<Check>({ state: 'idle' });
   const [db, setDb] = useState<Check>({ state: 'idle' });
   const busy = api.state === 'loading' || db.state === 'loading';
@@ -57,14 +59,21 @@ export default function App() {
         <p className="hint">Backend có thể chạy trước khi cấu hình database. Xem README.md để hoàn tất kết nối PostgreSQL.</p>
       </section>
       <section className="module-section" aria-labelledby="module-heading">
-        <div className="section-heading"><h2 id="module-heading">Phần việc của nhóm</h2><span>Các module đang chờ triển khai</span></div>
+        <div className="section-heading"><h2 id="module-heading">Phần việc của nhóm</h2><span>Phát triển theo từng module</span></div>
         <div className="module-grid">{modules.map(([id, title, owner, folder, backup]) =>
           <article className="module-card" key={id}>
             <div className="d-flex justify-content-between"><span className="module-number">{id}</span><span className="owner">{owner}</span></div>
             <h3>{title}</h3><code>{folder}</code><p>Người dự phòng: {backup}</p>
           </article>)}</div>
       </section>
-      <section className="next-step"><span className="next-marker">TIẾP THEO</span><div><h2>Đăng ký và đăng nhập</h2><p>Chốt DTO, quyền và bảng người dùng trước khi phát triển các chức năng phụ thuộc. Bộ khung hiện chưa có tài khoản, match hoặc chat thật.</p></div></section>
+      <section className="next-step"><span className="next-marker">TV4 DEMO</span><div><h2>Chat & thông báo</h2><p>Module thử nghiệm A/B/C của thành viên 4. Các tài khoản và match hiện chỉ là dữ liệu giả dùng trên máy local.</p><a className="btn btn-dark" href="/?view=tv4">Mở giao diện TV4</a></div></section>
+      <section className="next-step"><span className="next-marker">TIẾP THEO</span><div><h2>Đăng ký và đăng nhập</h2><p>Chốt DTO, quyền và bảng người dùng trước khi phát triển các chức năng phụ thuộc. Bộ khung hiện chưa có tài khoản và match thật; chat TV4 đang có bản demo giả lập tài khoản.</p></div></section>
     </main><footer className="container app-width">Đọc README.md để chạy dự án · docs/PHAN_CONG.md để nhận việc · docs/GIT_WORKFLOW.md để gửi PR</footer>
   </>;
+}
+
+export default function App() {
+  return new URLSearchParams(window.location.search).get('view') === 'tv4'
+    ? <div className="tv4-demo"><TV4DemoPage /></div>
+    : <HomeApp />;
 }
