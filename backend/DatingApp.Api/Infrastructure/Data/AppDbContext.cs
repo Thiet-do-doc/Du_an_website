@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using DatingApp.Api.Modules.SafetyAdmin.Entities;
 
 namespace DatingApp.Api.Infrastructure.Data;
 
@@ -6,6 +7,8 @@ namespace DatingApp.Api.Infrastructure.Data;
 // Add entities + reviewed migrations together; never use EnsureCreated in production.
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<UserBlock> UserBlocks => Set<UserBlock>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
