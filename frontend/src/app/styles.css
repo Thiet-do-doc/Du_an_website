@@ -1,0 +1,20 @@
+:root { font-family: Arial, sans-serif; color: #172d3b; background: #f5f4ef; }
+body { margin: 0; background: #f5f4ef; color: #172d3b; font-family: Arial, sans-serif; }
+.app-width { max-width: 1120px; }
+.topbar { padding: 25px 0; border-bottom: 1px solid #dedfd7; }
+.brand { font-size: 25px; font-weight: 800; letter-spacing: -1px; }.brand span { color: #447265; }
+.stage-label { font-size: 12px; color: #56665e; border: 1px solid #cdd5cc; border-radius: 30px; padding: 7px 12px; }
+.intro { padding: 56px 0 35px; max-width: 760px; }.eyebrow { font-size: 11px; letter-spacing: 1.8px; font-weight: 700; color: #517461; margin-bottom: 15px; }
+h1 { font-size: clamp(35px, 5.3vw, 61px); font-weight: 750; line-height: 1.13; letter-spacing: -2px; margin-bottom: 20px; }h1 span { color: #447265; }
+.intro-copy { max-width: 670px; font-size: 17px; line-height: 1.7; color: #5a676b; }
+.connection-panel { border: 1px solid #d8ded5; background: #fff; border-radius: 15px; padding: 28px; }
+.panel-heading, .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 15px; }.panel-heading .eyebrow { margin-bottom: 7px; }
+h2 { font-size: 23px; font-weight: 700; margin: 0; }.check-button { background: #172d3b; border-radius: 9px; padding: 12px 18px; }
+.status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }.status-card { padding: 20px; border-radius: 10px; background: #f4f6f2; }
+.status-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 13px; }.status-card p { margin-bottom: 0; font-size: 14px; color: #5a676b; }.status-card small { display: block; margin-top: 7px; font-size: 11px; color: #65756c; }.status-card .status-good { color: #24683f; font-weight: 600; }
+.hint { font-size: 12px; color: #69766d; margin: 17px 0 0; }.module-section { padding: 38px 0; }.section-heading { margin-bottom: 20px; }.section-heading span { color: #64726c; font-size: 12px; }
+.module-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }.module-card { border: 1px solid #dedfd7; border-radius: 12px; padding: 24px; background: #fafaf7; }
+.module-number { font-size: 13px; color: #748779; }.owner { font-size: 11px; border-radius: 20px; padding: 4px 9px; background: #e5ede2; color: #3a684e; }.module-card h3 { font-size: 18px; font-weight: 700; margin: 23px 0 10px; }.module-card code { font-size: 12px; color: #506b6e; overflow-wrap: anywhere; }.module-card p { font-size: 12px; color: #707c76; margin: 18px 0 0; }
+.next-step { display: flex; align-items: flex-start; gap: 26px; padding: 27px; background: #e7ede2; border-radius: 12px; }.next-marker { white-space: nowrap; font-size: 10px; font-weight: 700; letter-spacing: 1px; padding-top: 5px; }.next-step h2 { font-size: 19px; }.next-step p { margin: 10px 0 0; color: #56675c; font-size: 14px; line-height: 1.6; }footer { padding-top: 28px; padding-bottom: 28px; color: #6c7770; font-size: 11px; }
+@media(max-width: 760px) { .app-width { padding-left: 20px; padding-right: 20px; }.module-grid { grid-template-columns: 1fr 1fr; }.panel-heading { align-items: flex-start; flex-direction: column; }.status-grid { grid-template-columns: 1fr; }.section-heading { align-items: flex-start; flex-direction: column; }.connection-panel { padding: 22px; } }
+@media(max-width: 480px) { .module-grid { grid-template-columns: 1fr; }.stage-label { font-size: 10px; }.next-step { flex-direction: column; gap: 12px; }h1 { letter-spacing: -1px; }.intro { padding-top: 38px; } }

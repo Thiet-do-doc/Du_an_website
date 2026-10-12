@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/DatingApp.Api/DatingApp.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DatingApp.Api.Tests/DatingApp.Api.Tests.csproj" />
+  </Folder>
+</Solution>

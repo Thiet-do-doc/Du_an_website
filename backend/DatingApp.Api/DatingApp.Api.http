@@ -1,0 +1,10 @@
+@baseUrl = http://localhost:5080
+
+### Liveness: 200 even when PostgreSQL is not configured
+GET {{baseUrl}}/api/v1/health
+
+### Database: 200 if connected, otherwise 503
+GET {{baseUrl}}/api/v1/health/database
+
+### OpenAPI document, Development only; import URL into Postman
+GET {{baseUrl}}/openapi/v1.json
