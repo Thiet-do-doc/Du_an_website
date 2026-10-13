@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getHealth, type HealthResponse } from '../shared/api/health';
+import DiscoveryPage from '../features/discovery-matching/pages/DiscoveryPage';
 
 type Check = { state: 'idle' | 'loading' | 'done' | 'error'; data?: HealthResponse };
 const modules = [
@@ -11,6 +12,7 @@ const modules = [
 ];
 
 export default function App() {
+  const [showDiscovery, setShowDiscovery] = useState(false);
   const [api, setApi] = useState<Check>({ state: 'idle' });
   const [db, setDb] = useState<Check>({ state: 'idle' });
   const busy = api.state === 'loading' || db.state === 'loading';
@@ -39,6 +41,8 @@ export default function App() {
     </div>;
   }
 
+  if (showDiscovery) return <DiscoveryPage onBack={() => setShowDiscovery(false)} />;
+
   return <>
     <header className="topbar"><div className="container app-width d-flex justify-content-between align-items-center">
       <span className="brand">Dating<span>App</span></span><span className="stage-label">Bộ khung phát triển · v0.1</span>
@@ -64,6 +68,7 @@ export default function App() {
             <h3>{title}</h3><code>{folder}</code><p>Người dự phòng: {backup}</p>
           </article>)}</div>
       </section>
+      <section className="next-step"><span className="next-marker">TV3 · BẢN MẪU</span><div><h2>Khám phá & ghép đôi</h2><p>Xem trước luồng khám phá, lọc hồ sơ, gửi lời thích và danh sách kết nối của thành viên 3.</p><button className="btn btn-dark mt-2" onClick={() => setShowDiscovery(true)}>Mở bản xem trước</button></div></section>
       <section className="next-step"><span className="next-marker">TIẾP THEO</span><div><h2>Đăng ký và đăng nhập</h2><p>Chốt DTO, quyền và bảng người dùng trước khi phát triển các chức năng phụ thuộc. Bộ khung hiện chưa có tài khoản, match hoặc chat thật.</p></div></section>
     </main><footer className="container app-width">Đọc README.md để chạy dự án · docs/PHAN_CONG.md để nhận việc · docs/GIT_WORKFLOW.md để gửi PR</footer>
   </>;
