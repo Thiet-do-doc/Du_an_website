@@ -9,9 +9,13 @@ database **PostgreSQL + EF Core**. Một repository và một backend chia modul
 PostgreSQL; cấu trúc module; OpenAPI JSON; CI build/test; kiểm thử hợp đồng health;
 Compose chạy database local; hướng dẫn chạy và Git.
 
-**Chưa có:** đăng ký/đăng nhập/Identity/JWT, migration nghiệp vụ, upload, match,
-chat SignalR, admin và cấu hình deploy production. Thư mục module là nơi nhóm
-phát triển tiếp, không phải các chức năng đã hoàn thành.
+**Đã có trong backend:** Identity cookie auth, đăng ký/xác nhận email/đăng nhập,
+SafetyAdmin block/report user và API kiểm duyệt role `Admin`. Migration schema
+Identity + SafetyAdmin nằm trong `backend/DatingApp.Api/Infrastructure/Migrations`.
+
+**Chưa có:** giao diện đăng nhập hoàn chỉnh, role Admin provisioning, kiểm tra
+report message/post (chờ TV2/TV4), profile, match, chat SignalR và deploy production.
+Thư mục module khác vẫn là nơi nhóm phát triển tiếp.
 
 ## 1. Cài công cụ
 
