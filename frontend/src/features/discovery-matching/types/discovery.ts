@@ -17,8 +17,25 @@ export type DiscoveryFilters = {
   interest: string;
 };
 
-export type Match = {
+export type DiscoveryPage = {
+  items: DiscoveryProfile[];
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export type LikeResult = {
+  isMatch: boolean;
+  matchId: string | null;
+  conversationId: string | null;
+  matchedAt: string | null;
+};
+
+export type MatchSummary = {
   id: string;
-  profile: DiscoveryProfile;
+  otherUserId: string;
+  conversationId: string;
   matchedAt: string;
+  isActive: boolean;
+  otherProfile: DiscoveryProfile;
 };

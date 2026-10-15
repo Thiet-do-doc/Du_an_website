@@ -8,6 +8,8 @@
 **/playwright-report/
 **/test-results/
 *.tsbuildinfo
+# Local .NET CLI home used for isolated restore/tooling
+.dotnet_cli/
 # Local configuration and secrets
 .env
 .env.*

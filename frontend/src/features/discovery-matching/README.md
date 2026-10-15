@@ -1,27 +1,21 @@
 # DiscoveryMatching frontend
 Chủ trì TV3; người dự phòng TV4.
 
-## Bản xem trước hiện tại
+## Giao diện và API
 
-- `pages/DiscoveryPage.tsx`: màn hình khám phá, lọc tuổi/khu vực/sở thích, thích hoặc bỏ qua hồ sơ, và danh sách kết nối.
-- `api/demoProfiles.ts`: dữ liệu trình bày tạm; một số hồ sơ tạo match minh hoạ khi được thích.
-- `types/discovery.ts`: kiểu dữ liệu frontend dự kiến cho hồ sơ, bộ lọc và match.
+- `pages/DiscoveryPage.tsx`: màn hình khám phá, lọc tuổi/khu vực/sở thích, phân trang, thích/bỏ qua, danh sách match và bỏ match; có loading/error/empty state.
+- `api/discovery.ts`: gọi API `/api/v1/discover`, `/user-likes`, `/passes`, `/matches`; hỗ trợ cookie cùng origin và chuyển DTO API sang kiểu giao diện. Cần nối bearer access token qua HTTP client chung khi TV1 hoàn tất Auth.
+- `types/discovery.ts`: kiểu dữ liệu hồ sơ, bộ lọc, phân trang, kết quả like và match.
 
-Toàn bộ thao tác hiện lưu trong React state và mất khi tải lại. Đây chưa phải luồng người dùng thật, chưa gửi yêu cầu lên backend và chưa tạo conversation. Không dùng dữ liệu mẫu cho demo phân quyền hay bảo mật.
+Không còn tự tạo match giả trên frontend. API cần principal đã xác thực; bộ khung chưa cài Auth nên yêu cầu hiện trả 401 cho tới khi TV1 nối middleware. Khi profile/block/chat adapter chưa được đăng ký, backend trả 503 theo cơ chế fail-closed.
 
-## Tích hợp tiếp theo
+## Phụ thuộc còn phải nối
 
-Sau khi TV1 có đăng nhập và TV2 cung cấp `ProfileSummary`, thay adapter dữ liệu mẫu bằng API đã xác thực:
+- TV1: cài authentication middleware/JWT và gắn bearer access token vào HTTP client chung. Controller chỉ chấp nhận UUID từ claim `NameIdentifier` hoặc `sub`; không có đường nhận UserId của người thực hiện từ client.
+- TV2: đăng ký `IDiscoveryProfileQuery`; triển khai tìm hồ sơ đủ tuổi, đủ điều kiện, chưa ẩn/khóa; lọc tuổi bằng ngày sinh nhưng chỉ trả tuổi, cùng phân trang và truy vấn nhiều hồ sơ theo UUID.
+- TV5: đăng ký `IBlockLookup` trả danh sách block hai chiều. Adapter mặc định từ chối truy vấn để fail-closed.
+- TV4: đăng ký `IMatchConversationBridge`; `EnsureConversationAsync` phải idempotent, trả conversation UUID và cùng scoped `AppDbContext`/transaction. Sự kiện match phát sau commit; client tải lại danh sách để khôi phục nếu lỡ sự kiện.
+- Migration `20261015150402_DiscoveryMatchingInitial` đã tạo ba bảng TV3; cần đồng bộ slot áp dụng với nhóm và bổ sung khóa ngoại sau khi schema Auth của TV1 sẵn sàng.
+- P1 Posts chỉ bắt đầu sau khi P0 ổn định và TV2 cung cấp module Posts.
 
-- `GET /api/v1/discover` — lọc và phân trang hồ sơ, loại chính mình, hồ sơ ẩn/khóa và block hai chiều.
-- `POST /api/v1/user-likes/{targetUserId}` và `POST /api/v1/passes/{targetUserId}`.
-- `GET /api/v1/matches` và `DELETE /api/v1/matches/{id}`.
-
-Khi backend báo match mới, TV3/TV4 cần bảo đảm conversation chỉ được tạo một lần và sự kiện realtime chỉ phát sau commit. Bỏ match phải thu hồi quyền gửi tin ở backend.
-
-- `pages/`: màn hình cấp route.
-- `components/`: thành phần chỉ dùng trong module.
-- `api/`: adapter dữ liệu; tái sử dụng client ở `shared/api/` khi API chung được bổ sung.
-- `types/`: kiểu dữ liệu frontend; cần đồng bộ thành DTO API sau khi chốt hợp đồng.
-
-Route preview được mở từ thẻ TV3 trên trang khung. Auth, route sản phẩm, API thật và backend chưa có trong repository hiện tại.
+Route preview được mở từ thẻ TV3 trên trang khung. Bản khung hiện chưa có Auth, Profile, block hoặc chat adapter thật nên các request chưa đăng nhập trả 401 và các chức năng cần adapter trả 503 cho tới khi các module đó được nối.
