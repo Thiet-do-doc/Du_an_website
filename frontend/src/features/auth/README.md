@@ -1,10 +1,10 @@
-# Auth frontend
-Chủ trì TV1; người dự phòng TV2.
-Đăng ký, đăng nhập, xác nhận email, JWT, refresh token, logout và quyền.
+﻿# Auth frontend
 
-- `pages/`: màn hình cấp route.
-- `components/`: thành phần chỉ dùng trong module.
-- `api/`: hàm gọi API; tái sử dụng client ở `shared/api/`.
-- `types/`: TypeScript DTO tương ứng với backend.
+AuthProvider giữ access token trong bộ nhớ, phục hồi phiên bằng refresh cookie,
+tuần tự hóa refresh, hỗ trợ logout giữa các tab. ProtectedRoute bảo vệ trang
+/account và /admin; backend vẫn kiểm tra quyền thật.
 
-Chưa có chức năng nghiệp vụ. Thống nhất auth và route trước khi nối vào app.
+Form: /register, /login, /confirm-email, /resend-confirmation, /forgot-password,
+/reset-password. Thông báo lỗi dữ liệu/CSRF/phiên hiển thị từ API Problem Details.
+Không lưu token vào localStorage. Vite proxy /api tới backend local.
+Xem docs/AUTH_TESTING.md và chạy npm test để kiểm tra logic client.
