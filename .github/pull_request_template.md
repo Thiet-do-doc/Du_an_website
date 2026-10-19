@@ -17,3 +17,7 @@
 - [ ] Không có secret, token hoặc dữ liệu người thật
 - [ ] Build và test qua
 - [ ] Đã cập nhật tài liệu liên quan
+- [ ] Nhánh dựa trên main có nền Auth Thiết; không thêm project/Auth trùng ở gốc
+- [ ] Dùng UUID và JWT chung; giữ các service/AuthProvider đang có
+- [ ] Nếu đổi DB: ghi migration đã áp dụng ở đâu, test DB riêng, không tạo lại bảng Identity
+- [ ] Nếu sửa file chung: mô tả phần thêm, không ghi đè toàn bộ bằng bản nhánh cũ

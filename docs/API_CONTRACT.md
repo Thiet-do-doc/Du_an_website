@@ -15,7 +15,8 @@ Ví dụ body health:
 Thời gian trên là ví dụ; server trả thời gian hiện tại khi chạy.
 
 Chưa có Swagger UI. Có thể import URL OpenAPI vào Postman hoặc mở các GET trực tiếp.
-Không có API auth/profile/match/chat giả. Các endpoint đó được thêm trong sprint sau.
+API Auth thật đã có: xem [Auth API và Postman](AUTH_TESTING.md).
+Các API profile/match/chat nghiệp vụ chưa có.
 
 Quy ước: camelCase cho JSON, UTC cho thời gian, UUID cho định danh; DTO không trả
 password hash, token bí mật hoặc ngày sinh của người khác. API nghiệp vụ sẽ dùng

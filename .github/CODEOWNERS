@@ -1,0 +1,14 @@
+# GitHub requests review; enforcement additionally requires a main branch rule.
+/.github/ @Thiet-do-doc
+/backend/DatingApp.Api/Program.cs @Thiet-do-doc
+/backend/DatingApp.Api/DatingApp.Api.csproj @Thiet-do-doc
+/backend/DatingApp.Api/Modules/Auth/ @Thiet-do-doc
+/backend/DatingApp.Api/Infrastructure/Data/ @Thiet-do-doc
+/backend/DatingApp.Api/Infrastructure/Migrations/ @Thiet-do-doc
+/frontend/src/app/ @Thiet-do-doc
+/frontend/src/main.tsx @Thiet-do-doc
+/frontend/src/features/auth/ @Thiet-do-doc
+/frontend/package.json @Thiet-do-doc
+/frontend/package-lock.json @Thiet-do-doc
+/docs/API_CONTRACT.md @Thiet-do-doc
+/scripts/Test-RepositoryLayout.ps1 @Thiet-do-doc

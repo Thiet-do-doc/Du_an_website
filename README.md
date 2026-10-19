@@ -3,15 +3,25 @@
 Frontend **React + TypeScript + Vite**, backend **ASP.NET Core Web API (.NET 10)**,
 database **PostgreSQL + EF Core**. Một repository và một backend chia module.
 
+Nền chung dùng bộ khung và Auth của Thiết: `IdentityUser<Guid>`, JWT và refresh
+token. Thành viên chuyển code từ các nhánh cũ theo
+[hướng dẫn tích hợp từng nhánh](docs/TICH_HOP_NHANH_THANH_VIEN.md).
+Chỉ chạy project trong `backend/DatingApp.Api` và `frontend`; các bản Auth/project
+trùng ở gốc từ PR #2 đã được thay bằng Auth trong module, lịch sử Git vẫn giữ nguyên.
+
 ## Có sẵn và chưa có
 
 **Có sẵn:** trang kiểm tra kết nối frontend/API/database; AppDbContext; cấu hình
 PostgreSQL; cấu trúc module; OpenAPI JSON; CI build/test; kiểm thử hợp đồng health;
 Compose chạy database local; hướng dẫn chạy và Git.
 
-**Chưa có:** đăng ký/đăng nhập/Identity/JWT, migration nghiệp vụ, upload, match,
-chat SignalR, admin và cấu hình deploy production. Thư mục module là nơi nhóm
-phát triển tiếp, không phải các chức năng đã hoàn thành.
+**Auth đã có:** Identity/PostgreSQL, register/confirm-email/login, JWT,
+refresh/logout, forgot/reset-password, giao diện React và kiểm thử.
+Xem [hướng dẫn Auth](docs/AUTH_TESTING.md) để chạy migration, lấy email local
+và import Postman collection.
+
+**Chưa có:** upload, match, chat SignalR nghiệp vụ, admin/report và deploy production.
+Auth đã cung cấp policy và hợp đồng kiểm tra tài khoản cho các module đó.
 
 ## 1. Cài công cụ
 
@@ -117,13 +127,15 @@ cd frontend
 npm run build
 ```
 CI chạy các kiểm tra tương tự khi push main hoặc mở PR.
-Health tests dùng probe giả có kiểm soát để test HTTP 200/503; muốn kiểm tra
-PostgreSQL thật, chạy server/database và thử endpoint như mục 3.
+Health tests dùng probe giả có kiểm soát để test HTTP 200/503.
+AuthFlowTests dùng PostgreSQL thật khi đặt AUTH_TEST_CONNECTION; CI có PostgreSQL
+test riêng. Xem docs/AUTH_TESTING.md để chạy các luồng tài khoản.
 
 ## 6. Công việc tiếp theo
 
-TV1 làm Auth đầu tiên: Identity + schema tài khoản + DTO + quyền; phối hợp TV2
-làm form đăng ký/đăng nhập. Nhóm chốt ID và contract trước khi thêm bảng nghiệp vụ.
+Auth đã có trong nền chung. TV2 bổ sung Profiles/media; TV3, TV4 và TV5 cập nhật
+module theo UUID, JWT và service tài khoản hiện tại. Các phần này cần PR và kiểm
+thử riêng trước khi có thể chạy toàn luồng. Xem hướng dẫn tích hợp ở trên.
 
 Local EF tool đã khai báo trong `.config/dotnet-tools.json`:
 ```powershell
