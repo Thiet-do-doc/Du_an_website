@@ -23,7 +23,20 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY (at least 32 bytes)}
+      Jwt__Issuer: DatingApp.Api
+      Jwt__Audience: DatingApp.Client
+      Jwt__ExpireMinutes: 10
+      Auth__FrontendUrl: ${AUTH_FRONTEND_URL:?Set HTTPS frontend URL}
+      Email__From: ${EMAIL_FROM:?Set EMAIL_FROM}
+      Email__SmtpHost: ${SMTP_HOST:?Set SMTP_HOST}
+      Email__SmtpPort: ${SMTP_PORT:-587}
+      Email__Username: ${SMTP_USERNAME:?Set SMTP_USERNAME}
+      Email__Password: ${SMTP_PASSWORD:?Set SMTP_PASSWORD}
+      DataProtection__KeyPath: /var/lib/datingapp/keys
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+    volumes:
+      - staging_auth_keys:/var/lib/datingapp/keys
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,6 +61,7 @@ services:
 
 volumes:
   staging_postgres_data:
+  staging_auth_keys:
 
 networks:
   internal:

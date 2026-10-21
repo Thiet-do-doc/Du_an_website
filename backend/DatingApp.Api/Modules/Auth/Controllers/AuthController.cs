@@ -1,144 +1,98 @@
-using System.Text;
+using DatingApp.Api.Modules.Auth.DTOs;
+using DatingApp.Api.Modules.Auth.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.EntityFrameworkCore;
-using DatingApp.Api.Modules.Auth.DTOs;
-using DatingApp.Api.Modules.Auth.Entities;
-using DatingApp.Api.Modules.Auth.Services;
-
+using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Claims;
 namespace DatingApp.Api.Modules.Auth.Controllers;
-
 [ApiController]
 [Route("api/v1/auth")]
-public sealed class AuthController(
-    UserManager<ApplicationUser> userManager,
-    SignInManager<ApplicationUser> signInManager,
-    IEmailSender emailSender,
-    IConfiguration configuration,
-    ILogger<AuthController> logger) : ControllerBase
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+public sealed class AuthController(AuthService auth, IAntiforgery antiforgery, IWebHostEnvironment environment) : ControllerBase
 {
-    [HttpPost("register")]
+    private const string CookieName = "datingapp.refresh";
+    [HttpGet("csrf")]
+    [AllowAnonymous]
+    public IActionResult Csrf() => Ok(new { token = antiforgery.GetAndStoreTokens(HttpContext).RequestToken });
+
+    [HttpPost("register"), AllowAnonymous, EnableRateLimiting("auth")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
-        if (!ModelState.IsValid) return ValidationProblem(ModelState);
-        if (!IsAdult(request.DateOfBirth))
-            return BadRequest(new { message = "Bạn phải đủ 18 tuổi để đăng ký." });
-
-        var email = request.Email.Trim();
-        if (await userManager.FindByEmailAsync(email) is not null)
-            return Conflict(new { message = "Email này đã được sử dụng." });
-
-        var user = new ApplicationUser
-        {
-            UserName = email,
-            Email = email,
-            DateOfBirth = request.DateOfBirth,
-            IsActive = true
-        };
-
-        var result = await userManager.CreateAsync(user, request.Password);
-        if (!result.Succeeded)
-            return BadRequest(new { errors = result.Errors.Select(e => new { e.Code, e.Description }) });
-
-        var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-        var baseUrl = configuration["App:PublicBaseUrl"]?.TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            return StatusCode(500, new { message = "Thiếu cấu hình App:PublicBaseUrl." });
-
-        var confirmUrl = $"{baseUrl}/api/v1/auth/confirm-email?userId={Uri.EscapeDataString(user.Id)}&token={Uri.EscapeDataString(encodedToken)}";
-        await emailSender.SendAsync(email, "Xác nhận email", $"<p>Nhấn để xác nhận email: <a href=\"{confirmUrl}\">Xác nhận email</a></p>");
-
-        return StatusCode(StatusCodes.Status201Created,
-            new AuthResponse("Đăng ký thành công. Vui lòng kiểm tra email để xác nhận tài khoản.", true));
+        var (result, userId) = await auth.RegisterAsync(request);
+        return result.Succeeded ? Ok(new { message = "Đăng ký thành công. Hãy kiểm tra email để xác nhận.", userId }) : IdentityFailure(result);
     }
-
-    [HttpGet("confirm-email")]
-    public async Task<IActionResult> ConfirmEmail([FromQuery] string userId, [FromQuery] string token)
-    {
-        var user = await userManager.FindByIdAsync(userId);
-        if (user is null) return BadRequest(new { message = "Liên kết xác nhận không hợp lệ." });
-        try
-        {
-            var decoded = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
-            var result = await userManager.ConfirmEmailAsync(user, decoded);
-            if (!result.Succeeded)
-                return BadRequest(new { message = "Liên kết xác nhận hết hạn hoặc không hợp lệ." });
-            return Ok(new AuthResponse("Xác nhận email thành công. Bạn có thể đăng nhập."));
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = "Liên kết xác nhận không hợp lệ." });
-        }
-    }
-
-    [HttpPost("login")]
+    [HttpPost("login"), AllowAnonymous, EnableRateLimiting("auth"), ValidateAuthCsrf]
     public async Task<IActionResult> Login(LoginRequest request)
     {
-        var user = await userManager.FindByEmailAsync(request.Email.Trim());
-        // Same error message avoids disclosing whether an email exists.
-        if (user is null || !user.IsActive)
-            return Unauthorized(new { message = "Email hoặc mật khẩu không đúng, hoặc tài khoản chưa hoạt động." });
-        if (!await userManager.IsEmailConfirmedAsync(user))
-            return Unauthorized(new { message = "Vui lòng xác nhận email trước khi đăng nhập." });
-
-        var result = await signInManager.PasswordSignInAsync(user, request.Password, isPersistent: false, lockoutOnFailure: true);
-        if (result.Succeeded) return Ok(new AuthResponse("Đăng nhập thành công."));
-        if (result.IsLockedOut) return StatusCode(StatusCodes.Status423Locked, new { message = "Tài khoản tạm khóa do đăng nhập sai nhiều lần." });
-        return Unauthorized(new { message = "Email hoặc mật khẩu không đúng." });
+        var session = await auth.LoginAsync(request);
+        return session is null ? InvalidLogin() : SessionResponse(session);
     }
-
-    [HttpPost("logout")]
+    [HttpPost("refresh"), AllowAnonymous, EnableRateLimiting("auth"), ValidateAuthCsrf]
+    public async Task<IActionResult> Refresh()
+    {
+        var raw = Request.Cookies[CookieName];
+        var session = string.IsNullOrEmpty(raw) ? null : await auth.RefreshAsync(raw);
+        if (session is not null) return SessionResponse(session);
+        ClearCookie();
+        return InvalidLogin();
+    }
+    [HttpPost("logout"), AllowAnonymous, ValidateAuthCsrf]
     public async Task<IActionResult> Logout()
     {
-        await signInManager.SignOutAsync();
-        return Ok(new AuthResponse("Đăng xuất thành công."));
+        await auth.LogoutAsync(Request.Cookies[CookieName]);
+        ClearCookie();
+        return NoContent();
     }
-
-    [HttpPost("forgot-password")]
+    [HttpPost("confirm-email"), AllowAnonymous, EnableRateLimiting("auth")]
+    public async Task<IActionResult> ConfirmEmail(ConfirmEmailRequest request)
+    {
+        var result = await auth.ConfirmEmailAsync(request);
+        return result.Succeeded ? Ok(new { message = "Email đã được xác nhận. Bạn có thể đăng nhập." }) : IdentityFailure(result);
+    }
+    [HttpPost("resend-confirmation"), AllowAnonymous, EnableRateLimiting("auth")]
+    public async Task<IActionResult> Resend(EmailRequest request)
+    {
+        await auth.SendConfirmationAsync(request.Email);
+        return EmailAccepted();
+    }
+    [HttpPost("forgot-password"), AllowAnonymous, EnableRateLimiting("auth")]
     public async Task<IActionResult> ForgotPassword(EmailRequest request)
     {
-        var user = await userManager.FindByEmailAsync(request.Email.Trim());
-        // Always return the same response to prevent email enumeration.
-        if (user is not null && user.IsActive && await userManager.IsEmailConfirmedAsync(user))
-        {
-            var token = await userManager.GeneratePasswordResetTokenAsync(user);
-            var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
-            var baseUrl = configuration["App:PublicBaseUrl"]?.TrimEnd('/');
-            if (!string.IsNullOrWhiteSpace(baseUrl))
-            {
-                var resetUrl = $"{baseUrl}/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(encodedToken)}";
-                await emailSender.SendAsync(user.Email!, "Đặt lại mật khẩu", $"<p>Liên kết đặt lại mật khẩu: <a href=\"{resetUrl}\">Đặt lại mật khẩu</a></p>");
-            }
-        }
-        return Ok(new AuthResponse("Nếu email tồn tại và đã xác nhận, hướng dẫn đặt lại mật khẩu sẽ được gửi."));
+        await auth.ForgotPasswordAsync(request.Email);
+        return EmailAccepted();
     }
-
-    [HttpPost("reset-password")]
+    [HttpPost("reset-password"), AllowAnonymous, EnableRateLimiting("auth")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
     {
-        var user = await userManager.FindByEmailAsync(request.Email.Trim());
-        if (user is null) return BadRequest(new { message = "Không thể đặt lại mật khẩu bằng thông tin đã cung cấp." });
-        try
-        {
-            var decoded = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
-            var result = await userManager.ResetPasswordAsync(user, decoded, request.NewPassword);
-            if (result.Succeeded) return Ok(new AuthResponse("Đặt lại mật khẩu thành công."));
-            return BadRequest(new { errors = result.Errors.Select(e => new { e.Code, e.Description }) });
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = "Token đặt lại mật khẩu không hợp lệ." });
-        }
+        var result = await auth.ResetPasswordAsync(request);
+        return result.Succeeded ? Ok(new { message = "Đã đổi mật khẩu. Hãy đăng nhập lại." }) : IdentityFailure(result);
     }
-
-    private static bool IsAdult(DateOnly dateOfBirth)
+    [Authorize(Policy = "User"), HttpGet("me")]
+    public IActionResult Me() => Ok(new { authenticated = true, userId = User.FindFirstValue(ClaimTypes.NameIdentifier),
+        email = User.FindFirstValue(ClaimTypes.Email), roles = User.FindAll(ClaimTypes.Role).Select(x => x.Value) });
+    [Authorize(Policy = "Admin"), HttpGet("admin-check")]
+    public IActionResult AdminCheck() => Ok(new { authorized = true });
+    private IActionResult EmailAccepted() => Ok(new { message = "Nếu tài khoản phù hợp, email hướng dẫn sẽ được gửi." });
+    private IActionResult InvalidLogin() => Problem(statusCode: 401, title: "Đăng nhập không thành công.",
+        detail: "Kiểm tra email, mật khẩu, xác nhận email hoặc trạng thái tài khoản.");
+    private IActionResult IdentityFailure(IdentityResult result)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (dateOfBirth > today) return false;
-        var age = today.Year - dateOfBirth.Year;
-        if (dateOfBirth > today.AddYears(-age)) age--;
-        return age >= 18;
+        foreach (var error in result.Errors) ModelState.AddModelError(error.Code, error.Description);
+        return ValidationProblem(ModelState);
     }
+    private IActionResult SessionResponse(AuthSession session)
+    {
+        Response.Cookies.Append(CookieName, session.RefreshToken, CookieOptions(session.RefreshExpiresAt));
+        var result = session.Response;
+        return Ok(new { message = "Đăng nhập thành công.", token = result.Token, expiresAt = result.ExpiresAt,
+            user = new { id = result.UserId, email = result.Email } });
+    }
+    private CookieOptions CookieOptions(DateTimeOffset? expires = null) => new()
+    {
+        HttpOnly = true, Secure = !environment.IsDevelopment(), SameSite = SameSiteMode.Strict,
+        Path = "/api/v1/auth", Expires = expires, IsEssential = true
+    };
+    private void ClearCookie() => Response.Cookies.Delete(CookieName, CookieOptions());
 }

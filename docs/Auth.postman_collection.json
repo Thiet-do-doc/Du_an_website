@@ -1,0 +1,423 @@
+{
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:5080"
+                     },
+                     {
+                         "key":  "email",
+                         "value":  "postman-test@example.com"
+                     },
+                     {
+                         "key":  "password",
+                         "value":  "DatingTest!2026"
+                     },
+                     {
+                         "key":  "newPassword",
+                         "value":  "NewDating!2026"
+                     },
+                     {
+                         "key":  "userId",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "confirmationToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "resetToken",
+                         "value":  ""
+                     },
+                     {
+                         "key":  "token",
+                         "value":  ""
+                     }
+                 ],
+    "event":  [
+                  {
+                      "script":  {
+                                     "exec":  [
+                                                  "if ([\u0027Login\u0027, \u0027Refresh\u0027, \u0027Logout\u0027].includes(pm.info.requestName)) {",
+                                                  "  pm.sendRequest(pm.variables.get(\u0027baseUrl\u0027) + \u0027/api/v1/auth/csrf\u0027, (error, response) =\u003e {",
+                                                  "    if (error || response.code !== 200) throw new Error(\u0027Cannot obtain CSRF token\u0027);",
+                                                  "    pm.request.headers.upsert({ key: \u0027X-CSRF-TOKEN\u0027, value: response.json().token });",
+                                                  "  });",
+                                                  "}"
+                                              ],
+                                     "type":  "text/javascript"
+                                 },
+                      "listen":  "prerequest"
+                  },
+                  {
+                      "script":  {
+                                     "exec":  [
+                                                  "if (pm.response.code === 200) {",
+                                                  "  const body = pm.response.json();",
+                                                  "  if (body.token \u0026\u0026 [\u0027Login\u0027, \u0027Refresh\u0027].includes(pm.info.requestName)) pm.collectionVariables.set(\u0027token\u0027, body.token);",
+                                                  "  if (body.userId \u0026\u0026 pm.info.requestName === \u0027Register\u0027) pm.collectionVariables.set(\u0027userId\u0027, body.userId);",
+                                                  "}",
+                                                  "if (pm.info.requestName === \u0027Logout\u0027 \u0026\u0026 pm.response.code === 204) pm.collectionVariables.set(\u0027token\u0027, \u0027\u0027);"
+                                              ],
+                                     "type":  "text/javascript"
+                                 },
+                      "listen":  "test"
+                  }
+              ],
+    "info":  {
+                 "description":  "Local Auth flows. Enable cookie jar. Copy confirmation/reset tokens from the development mailbox.",
+                 "name":  "DatingApp Auth",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "item":  [
+                 {
+                     "name":  "CSRF",
+                     "request":  {
+                                     "method":  "GET",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/csrf",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "csrf"
+                                                          ]
+                                             },
+                                     "header":  [
+
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Register",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n    \"email\":  \"{{email}}\",\r\n    \"confirmPassword\":  \"{{password}}\",\r\n    \"password\":  \"{{password}}\",\r\n    \"dateOfBirth\":  \"2000-01-01\"\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/register",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "register"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Resend confirmation",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n    \"email\":  \"{{email}}\"\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/resend-confirmation",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "resend-confirmation"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Confirm email",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n    \"userId\":  \"{{userId}}\",\r\n    \"token\":  \"{{confirmationToken}}\"\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/confirm-email",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "confirm-email"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Login",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n    \"password\":  \"{{password}}\",\r\n    \"email\":  \"{{email}}\"\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/login",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "login"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Me",
+                     "request":  {
+                                     "method":  "GET",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/me",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "me"
+                                                          ]
+                                             },
+                                     "header":  [
+
+                                                ],
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "Admin check",
+                     "request":  {
+                                     "method":  "GET",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/admin-check",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "admin-check"
+                                                          ]
+                                             },
+                                     "header":  [
+
+                                                ],
+                                     "auth":  {
+                                                  "bearer":  [
+                                                                 {
+                                                                     "key":  "token",
+                                                                     "type":  "string",
+                                                                     "value":  "{{token}}"
+                                                                 }
+                                                             ],
+                                                  "type":  "bearer"
+                                              }
+                                 }
+                 },
+                 {
+                     "name":  "Refresh",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/refresh",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "refresh"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Logout",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/logout",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "logout"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Forgot password",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n    \"email\":  \"{{email}}\"\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/forgot-password",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "forgot-password"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 },
+                 {
+                     "name":  "Reset password",
+                     "request":  {
+                                     "body":  {
+                                                  "raw":  "{\r\n    \"email\":  \"{{email}}\",\r\n    \"confirmPassword\":  \"{{newPassword}}\",\r\n    \"token\":  \"{{resetToken}}\",\r\n    \"password\":  \"{{newPassword}}\"\r\n}",
+                                                  "options":  {
+                                                                  "raw":  {
+                                                                              "language":  "json"
+                                                                          }
+                                                              },
+                                                  "mode":  "raw"
+                                              },
+                                     "method":  "POST",
+                                     "url":  {
+                                                 "host":  [
+                                                              "{{baseUrl}}"
+                                                          ],
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/reset-password",
+                                                 "path":  [
+                                                              "api",
+                                                              "v1",
+                                                              "auth",
+                                                              "reset-password"
+                                                          ]
+                                             },
+                                     "header":  [
+                                                    {
+                                                        "key":  "Content-Type",
+                                                        "value":  "application/json"
+                                                    }
+                                                ]
+                                 }
+                 }
+             ],
+    "auth":  {
+                 "type":  "noauth"
+             }
+}

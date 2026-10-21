@@ -65,7 +65,8 @@ public sealed class AdminModerationController(
     [HttpPatch("users/{id}/status")]
     public async Task<ActionResult<ModerationActionResponse>> SetUserStatus(string id, UpdateUserStatusRequest request, CancellationToken cancellationToken)
     {
-        var exists = await db.Users.AnyAsync(x => x.Id == id, cancellationToken);
+        if (!Guid.TryParse(id, out var userId)) return BadRequest();
+        var exists = await db.Users.AnyAsync(x => x.Id == userId, cancellationToken);
         if (!exists) return NotFound();
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var reason = request.Reason.Trim();

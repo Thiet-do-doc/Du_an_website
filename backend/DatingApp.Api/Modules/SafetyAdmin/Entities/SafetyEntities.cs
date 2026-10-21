@@ -3,14 +3,6 @@ namespace DatingApp.Api.Modules.SafetyAdmin.Entities;
 public enum ReportTargetType { User, Message, Post }
 public enum ReportStatus { Pending, Reviewed, Dismissed, Actioned }
 
-public sealed class UserBlock
-{
-    public Guid Id { get; set; }
-    public required string BlockerUserId { get; set; }
-    public required string BlockedUserId { get; set; }
-    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
-}
-
 public sealed class UserReport
 {
     public Guid Id { get; set; }

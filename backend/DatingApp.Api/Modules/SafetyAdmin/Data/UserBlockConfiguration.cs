@@ -1,4 +1,5 @@
 using DatingApp.Api.Modules.SafetyAdmin.Entities;
+using DatingApp.Api.Modules.Auth.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,6 +15,8 @@ public sealed class UserBlockConfiguration : IEntityTypeConfiguration<UserBlock>
         builder.Property(block => block.BlockedUserId).HasColumnName("blocked_user_id");
         builder.Property(block => block.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.HasIndex(block => block.BlockedUserId);
+        builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(block => block.BlockerUserId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(block => block.BlockedUserId).OnDelete(DeleteBehavior.Cascade);
         builder.ToTable(table => table.HasCheckConstraint(
             "ck_user_blocks_no_self_block", "blocker_user_id <> blocked_user_id"));
     }

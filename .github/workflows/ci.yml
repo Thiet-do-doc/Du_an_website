@@ -6,6 +6,13 @@ on:
 permissions:
   contents: read
 jobs:
+  repository-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shared project layout
+        shell: pwsh
+        run: ./scripts/Test-RepositoryLayout.ps1
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -20,8 +27,23 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      - run: npm test
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: datingapp_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d datingapp_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      AUTH_TEST_CONNECTION: Host=127.0.0.1;Port=5432;Database=datingapp_test;Username=postgres;Password=ci_test_password
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -29,4 +51,14 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet restore DatingApp.slnx
       - run: dotnet build DatingApp.slnx --no-restore --configuration Release
+      - run: dotnet tool restore
+      - run: dotnet ef database update --project backend/DatingApp.Api --configuration Release --no-build
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=5432;Database=datingapp_test;Username=postgres;Password=ci_test_password
+          Jwt__Key: ci-only-test-signing-key-at-least-32-bytes
+          Auth__FrontendUrl: https://frontend.test
+      - run: dotnet ef migrations has-pending-model-changes --project backend/DatingApp.Api --configuration Release --no-build
+        env:
+          ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=5432;Database=datingapp_test;Username=postgres;Password=ci_test_password
       - run: dotnet test DatingApp.slnx --no-build --configuration Release

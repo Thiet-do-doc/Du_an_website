@@ -29,7 +29,8 @@ public sealed class ReportsController(AppDbContext db, UserManager<ApplicationUs
         {
             targetUserId = request.TargetId.Trim();
             if (targetUserId == actorId) return BadRequest(new { message = "Bạn không thể báo cáo chính mình." });
-            if (await users.FindByIdAsync(targetUserId) is null) return NotFound(new { message = "Không tìm thấy người dùng được báo cáo." });
+            if (!Guid.TryParse(targetUserId, out var targetGuid)) return BadRequest();
+            if (await users.FindByIdAsync(targetGuid.ToString()) is null) return NotFound(new { message = "Không tìm thấy người dùng được báo cáo." });
         }
         var report = new UserReport
         {

@@ -1,18 +1,12 @@
-# Auth
-- Chủ trì: **TV1**. Dự phòng: **TV2**.
-- Phạm vi: Đăng ký, đăng nhập, xác nhận email, JWT, refresh token, logout và quyền.
-- Bảng dự kiến: Identity và RefreshTokens.
-- Frontend tương ứng: `frontend/src/features/auth/`.
+﻿# Auth
 
-Đây là chỗ phát triển tiếp, chưa có endpoint nghiệp vụ.
+TV1 chủ trì, TV2 dự phòng. Đã có Identity/PostgreSQL, đăng ký/xác nhận email,
+đăng nhập, JWT, refresh rotation, logout, forgot/reset password, CurrentUser,
+User/Admin policy, trạng thái tài khoản, rate limit, CSRF và giao diện React.
 
-## Đầu việc đầu tiên
-1. Chốt request/response DTO và quy tắc quyền với thành viên liên quan.
-2. Tạo entity, cấu hình EF Core và migration có review khi đã chốt schema.
-3. Xây service xử lý nghiệp vụ; controller chỉ nhận, kiểm tra và trả HTTP.
-4. Nối giao diện React với API thật, có loading/error/empty.
-5. Thêm kiểm thử sai quyền và quy tắc quan trọng; gửi PR cho người khác review.
+Hướng dẫn chạy, Postman, cấu hình email/production và hợp đồng TV4/TV5:
+[docs/AUTH_TESTING.md](../../../../docs/AUTH_TESTING.md).
 
-Không tạo bảng hoặc API trùng với module khác. Không phát triển trước Auth
-bằng cách cho phép mọi người thao tác dữ liệu. Trao đổi API qua `Shared/Contracts`
-và service nếu cần thay đổi dữ liệu thuộc module khác.
+ChatHub và SafetyAdmin nghiệp vụ chưa có trong repo; Auth cung cấp IAccountAccess,
+AccountHubFilter và registry cho module đó tích hợp. Quyền match/block/audit do
+module sở hữu thực hiện. RefreshTokens và Identity do Auth quản lý.

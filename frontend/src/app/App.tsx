@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { getHealth, type HealthResponse } from '../shared/api/health';
-import SafetyAdminPanel from '../features/safety-admin/SafetyAdminPanel';
 
 type Check = { state: 'idle' | 'loading' | 'done' | 'error'; data?: HealthResponse };
 const modules = [
@@ -42,7 +41,7 @@ export default function App() {
 
   return <>
     <header className="topbar"><div className="container app-width d-flex justify-content-between align-items-center">
-      <span className="brand">Dating<span>App</span></span><span className="stage-label">Bộ khung phát triển · v0.1</span>
+      <span className="brand">Dating<span>App</span></span><div className="d-flex gap-3"><a href="/blocks">Chặn người dùng</a><a href="/profile">Hồ sơ</a><a href="/account">Tài khoản</a></div>
     </div></header>
     <main className="container app-width">
       <section className="intro">
@@ -65,8 +64,7 @@ export default function App() {
             <h3>{title}</h3><code>{folder}</code><p>Người dự phòng: {backup}</p>
           </article>)}</div>
       </section>
-      <section className="next-step"><span className="next-marker">TIẾP THEO</span><div><h2>Đăng ký và đăng nhập</h2><p>Chốt DTO, quyền và bảng người dùng trước khi phát triển các chức năng phụ thuộc. Bộ khung hiện chưa có tài khoản, match hoặc chat thật.</p></div></section>
-      <SafetyAdminPanel />
+      <section className="next-step"><span className="next-marker">TÀI KHOẢN</span><div><h2>Đăng ký và đăng nhập</h2><p>Tạo tài khoản, xác nhận email và đăng nhập để sử dụng các chức năng tiếp theo.</p><a href="/register">Đăng ký</a> · <a href="/login">Đăng nhập</a></div></section>
     </main><footer className="container app-width">Đọc README.md để chạy dự án · docs/PHAN_CONG.md để nhận việc · docs/GIT_WORKFLOW.md để gửi PR</footer>
   </>;
 }

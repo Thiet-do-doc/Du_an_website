@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '../auth/api';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 
 type ReportType = 'User' | 'Message' | 'Post';
@@ -9,18 +10,9 @@ type Report = {
   reviewedAtUtc?: string | null;
 };
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init, credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as { message?: string; title?: string } | null;
-    throw new Error(body?.message ?? body?.title ?? `Yêu cầu thất bại (${response.status})`);
-  }
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
-}
+const request = <T,>(path: string, init: RequestInit = {}) => authenticatedFetch<T>(path, {
+  ...init, headers: { 'Content-Type': 'application/json', ...init.headers },
+});
 
 export default function SafetyAdminPanel() {
   const [targetType, setTargetType] = useState<ReportType>('User');
