@@ -66,7 +66,7 @@ function ProfileEditor() {
         <div className="photo-actions"><button type="button" onClick={() => void run(() => setAvatar(photo.id), 'Đã chọn ảnh đại diện.')} disabled={busy || photo.isAvatar}>Chọn đại diện</button>
           <button type="button" onClick={() => void move(i, -1)} disabled={busy || i === 0} aria-label="Chuyển ảnh lên trước">↑</button>
           <button type="button" onClick={() => void move(i, 1)} disabled={busy || i === (profile.photos.length - 1)} aria-label="Chuyển ảnh xuống sau">↓</button>
-          <button type="button" onClick={() => void run(() => deletePhoto(photo.id), 'Đã xóa ảnh.')}>Xóa</button></div></article>) : <p className="photo-empty">Thêm ảnh để hoàn thiện hồ sơ của bạn.</p>}</div>
+          <button type="button" onClick={() => void run(() => deletePhoto(photo.id), 'Đã xóa ảnh.')}>Xóa</button></div></article>) : <div className="photo-placeholder" role="img" aria-label="Ảnh đại diện mặc định"><span aria-hidden="true">♥</span><p>Ảnh đại diện sẽ xuất hiện ở đây</p></div>}</div>
     </section>
   </div>;
 }
