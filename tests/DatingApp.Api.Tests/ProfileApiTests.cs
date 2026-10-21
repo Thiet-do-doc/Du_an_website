@@ -56,9 +56,17 @@ public sealed partial class AuthFlowTests
         Assert.Equal("Cập nhật lần hai", secondSaveJson.GetProperty("bio").GetString());
         Assert.Equal(2, secondSaveJson.GetProperty("interests").GetArrayLength());
 
-        // The API only exposes owner-scoped writes; sending another user's id cannot redirect it.
-        Assert.Equal(HttpStatusCode.NotFound,
-            (await owner.PutApi($"profiles/{otherAccount.Id}", new { displayName = "Đổi hộ" }, ownerToken)).StatusCode);
+        // A forged userId in the payload cannot redirect an owner-scoped write.
+        var ownershipAttempt = await owner.PutApi("profiles/me", new
+        {
+            userId = otherAccount.Id, displayName = "Không được sửa hồ sơ B", bio = "", city = "Hà Nội",
+            gender = "Nữ", isDiscoverable = true, interestIds = new[] { SampleInterests[0] }
+        }, ownerToken);
+        Assert.Equal(HttpStatusCode.OK, ownershipAttempt.StatusCode);
+        Assert.Equal(ownerAccount.Id,
+            (await ownershipAttempt.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("userId").GetGuid());
+        var otherBeforeEdit = await other.GetApi("profiles/me", otherToken);
+        Assert.Equal("", (await otherBeforeEdit.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("displayName").GetString());
         var publicResponse = await owner.GetApi($"profiles/{ownerAccount.Id}", ownerToken);
         Assert.Equal(HttpStatusCode.OK, publicResponse.StatusCode);
         var publicJson = await publicResponse.Content.ReadFromJsonAsync<JsonElement>();
