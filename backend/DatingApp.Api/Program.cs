@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
+using DatingApp.Api.Modules.Profiles.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,10 @@ if (builder.Configuration["DataProtection:KeyPath"] is string keyPath)
     builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keyPath));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<ProfileService>();
+builder.Services.AddScoped<PhotoService>();
+builder.Services.AddScoped<IDiscoveryProfileQuery>(sp => sp.GetRequiredService<ProfileService>());
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AuthConnectionRegistry>();
 builder.Services.AddSignalR(options => options.AddFilter<AccountHubFilter>());
 builder.Services.AddAntiforgery(options =>
