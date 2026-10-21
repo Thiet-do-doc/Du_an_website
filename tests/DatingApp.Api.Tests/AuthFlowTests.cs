@@ -22,7 +22,7 @@ public sealed class PostgresFactAttribute : FactAttribute
             Skip = "Đặt AUTH_TEST_CONNECTION để kiểm thử PostgreSQL thật (database local/test đã áp dụng migration).";
     }
 }
-public sealed class AuthFlowTests
+public sealed partial class AuthFlowTests
 {
     private const string Password = "DatingTest!2026";
     [PostgresFact]
@@ -224,7 +224,7 @@ public sealed class AuthFlowTests
         }
         public Browser Browser() => new(CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false, BaseAddress = new Uri("https://localhost") }));
     }
-    private sealed class Browser(HttpClient client) : IDisposable
+    private sealed partial class Browser(HttpClient client) : IDisposable
     {
         public Dictionary<string, string> Cookies { get; } = new();
         public async Task<HttpResponseMessage> Get(string path, string? bearer = null) => await Send(HttpMethod.Get, path, null, bearer, null);

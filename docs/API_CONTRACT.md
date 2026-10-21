@@ -16,7 +16,10 @@ Thời gian trên là ví dụ; server trả thời gian hiện tại khi chạy
 
 Chưa có Swagger UI. Có thể import URL OpenAPI vào Postman hoặc mở các GET trực tiếp.
 API Auth thật đã có: xem [Auth API và Postman](AUTH_TESTING.md).
-Các API profile/match/chat nghiệp vụ chưa có.
+Profiles có API xem/sửa hồ sơ cá nhân, hồ sơ công khai, danh mục sở thích và
+upload/đặt/xóa/sắp xếp ảnh; hợp đồng chi tiết nằm trong
+[`Modules/Profiles/README.md`](../backend/DatingApp.Api/Modules/Profiles/README.md).
+Match/chat chưa có API nghiệp vụ tích hợp.
 
 Quy ước: camelCase cho JSON, UTC cho thời gian, UUID cho định danh; DTO không trả
 password hash, token bí mật hoặc ngày sinh của người khác. API nghiệp vụ sẽ dùng
