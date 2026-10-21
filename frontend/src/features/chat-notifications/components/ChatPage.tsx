@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HubConnection, HubConnectionBuilder, HubConnectionState,
   HttpTransportType, LogLevel } from '@microsoft/signalr';
-import { getConversations, getMessages, getNotifications, markRead } from '../api/chatApi';
+import { getConversations, getMessages, getNotifications, markRead, reportMessage } from '../api/chatApi';
 import type { ChatNotification, Conversation, Delivery, Message } from '../types/chat';
 
-type Props = { token: string; userId: string; displayName: string };
+type Props = { token: string; userId: string; displayName: string; getAccessToken?: () => Promise<string> };
 type ConnectionStatus = 'Đang kết nối' | 'Đã kết nối' | 'Đang nối lại' | 'Mất kết nối';
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', {
@@ -16,24 +16,35 @@ const mergeById = (before: Message[], incoming: Message[]) => {
   return [...map.values()].sort((a, b) =>
     a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id));
 };
+const mergeNotificationsById = (before: ChatNotification[], incoming: ChatNotification[]) => {
+  const map = new Map(before.map(x => [x.id, x]));
+  for (const item of incoming) map.set(item.id, item);
+  return [...map.values()].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+};
 
-export function ChatPage({ token, userId, displayName }: Props) {
+export function ChatPage({ token, userId, displayName, getAccessToken }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [notifications, setNotifications] = useState<ChatNotification[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [notificationCursor, setNotificationCursor] = useState<string | null>(null);
+  const [notificationBusy, setNotificationBusy] = useState(false);
   const [pending, setPending] = useState<Delivery[]>([]);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState<ConnectionStatus>('Đang kết nối');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
   const connectionRef = useRef<HubConnection | null>(null);
   const currentRef = useRef(current);
   const messagesRef = useRef(messages);
+  const notificationsRef = useRef(notifications);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => { currentRef.current = current; }, [current]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
   const refreshList = useCallback(async () => {
@@ -44,8 +55,23 @@ export function ChatPage({ token, userId, displayName }: Props) {
   }, [token]);
   const refreshNotifications = useCallback(async () => {
     const data = await getNotifications(token);
-    setNotifications(data.items);
+    setNotifications(prev => mergeNotificationsById(prev, data.items));
+    setNotificationCursor(data.nextCursor);
   }, [token]);
+
+  const catchUpNotifications = useCallback(async () => {
+    const latest = notificationsRef.current[0];
+    if (!latest) {
+      await refreshNotifications();
+      return;
+    }
+    let afterId: string | null = latest.id;
+    for (let pageIndex = 0; afterId && pageIndex < 50; pageIndex++) {
+      const page = await getNotifications(token, { afterId, pageSize: 50 });
+      setNotifications(old => mergeNotificationsById(old, page.items));
+      afterId = page.nextAfterId;
+    }
+  }, [token, refreshNotifications]);
 
   const catchUp = useCallback(async () => {
     const id = currentRef.current;
@@ -55,6 +81,7 @@ export function ChatPage({ token, userId, displayName }: Props) {
       const page = await getMessages(token, id);
       if (currentRef.current !== id) return;
       setMessages(page.items);
+      setPending(prev => prev.filter(p => !page.items.some(m => m.clientMessageId === p.clientMessageId)));
       setCursor(page.nextCursor);
       return;
     }
@@ -63,6 +90,7 @@ export function ChatPage({ token, userId, displayName }: Props) {
       const page = await getMessages(token, id, { afterId });
       if (currentRef.current !== id) return;
       setMessages(old => mergeById(old, page.items));
+      setPending(prev => prev.filter(p => !page.items.some(m => m.clientMessageId === p.clientMessageId)));
       afterId = page.nextAfterId;
     }
   }, [token]);
@@ -92,12 +120,60 @@ export function ChatPage({ token, userId, displayName }: Props) {
 
   useEffect(() => {
     let disposed = false;
+    let retryTimer: number | null = null;
+    let startAttempt = 0;
     const conn = new HubConnectionBuilder()
-      .withUrl('/hubs/chat', { accessTokenFactory: () => token, transport: HttpTransportType.WebSockets | HttpTransportType.LongPolling })
+      .withUrl('/hubs/chat', { accessTokenFactory: () => getAccessToken ? getAccessToken() : token, transport: HttpTransportType.WebSockets | HttpTransportType.LongPolling })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .configureLogging(LogLevel.Warning)
       .build();
     connectionRef.current = conn;
+
+    const joinSelected = async () => {
+      const selected = currentRef.current;
+      if (selected) await conn.invoke('JoinConversation', selected);
+    };
+    const synchronize = () => {
+      void catchUp().catch(e => setError(String(e)));
+      void catchUpNotifications().catch(e => setError(String(e)));
+      void refreshList().catch(() => {});
+      void refreshNotifications().catch(() => {});
+    };
+    const requiresLogin = (cause: unknown) => {
+      const text = cause instanceof Error ? cause.message : String(cause ?? '');
+      return /\b(401|403)\b|unauthori[sz]ed|forbidden|token.*expired|phiên.*không hợp lệ/i.test(text);
+    };
+    const scheduleRetry = (cause: unknown) => {
+      if (disposed || retryTimer !== null) return;
+      if (requiresLogin(cause)) {
+        setStatus('Mất kết nối');
+        setError('Phiên đăng nhập không còn hợp lệ. Hãy đăng nhập lại.');
+        return;
+      }
+      const delay = Math.min(30000, 1000 * (2 ** Math.min(startAttempt, 5)));
+      startAttempt += 1;
+      setStatus('Đang nối lại');
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        void startConnection();
+      }, delay);
+    };
+    const startConnection = async () => {
+      if (disposed || conn.state !== HubConnectionState.Disconnected) return;
+      try {
+        await conn.start();
+      } catch (e) {
+        if (!disposed) scheduleRetry(e);
+        return;
+      }
+      if (disposed) { await conn.stop(); return; }
+      startAttempt = 0;
+      setStatus('Đã kết nối');
+      setError('');
+      try { await joinSelected(); } catch (e) { setError(String(e)); }
+      synchronize();
+    };
+
     conn.on('MessageCreated', (item: Message) => {
       if (item.conversationId === currentRef.current) {
         setMessages(prev => mergeById(prev, [item]));
@@ -107,34 +183,37 @@ export function ChatPage({ token, userId, displayName }: Props) {
     });
     conn.on('MatchCreated', () => {
       void refreshList().catch(() => {});
+      void catchUpNotifications().catch(() => {});
       void refreshNotifications().catch(() => {});
     });
+    conn.on('MatchEnded', () => {
+      // Keep the conversation/history available, but refresh canSend from the current Match row.
+      void refreshList().catch(e => setError(String(e)));
+    });
     conn.on('NotificationCreated', (item: ChatNotification) => {
-      setNotifications(prev => [item, ...prev.filter(x => x.id !== item.id)]);
+      setNotifications(prev => mergeNotificationsById(prev, [item]));
     });
     conn.onreconnecting(() => { if (!disposed) setStatus('Đang nối lại'); });
     conn.onreconnected(() => {
       if (disposed) return;
       setStatus('Đã kết nối');
-      const selected = currentRef.current;
-      if (selected) void conn.invoke('JoinConversation', selected).catch(e => setError(String(e)));
-      void catchUp().catch(e => setError(String(e)));
-      void refreshList().catch(e => setError(String(e)));
-      void refreshNotifications().catch(e => setError(String(e)));
+      setError('');
+      void joinSelected().catch(e => setError(String(e)));
+      synchronize();
     });
-    conn.onclose(() => { if (!disposed) setStatus('Mất kết nối'); });
-    void conn.start().then(async () => {
+    conn.onclose(error => {
       if (disposed) return;
-      setStatus('Đã kết nối');
-      if (currentRef.current) await conn.invoke('JoinConversation', currentRef.current);
-      await catchUp();
-    }).catch(e => { if (!disposed) { setStatus('Mất kết nối'); setError(String(e)); } });
+      setStatus('Mất kết nối');
+      scheduleRetry(error ?? new Error('SignalR connection closed.'));
+    });
+    void startConnection();
     return () => {
       disposed = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
       connectionRef.current = null;
       void conn.stop();
     };
-  }, [token, refreshList, refreshNotifications, catchUp]);
+  }, [token, getAccessToken, refreshList, refreshNotifications, catchUp, catchUpNotifications]);
 
   const sendWithId = async (content: string, clientMessageId: string) => {
     const conn = connectionRef.current;
@@ -180,6 +259,34 @@ export function ChatPage({ token, userId, displayName }: Props) {
       setNotifications(prev => prev.map(x => x.id === item.id ? item : x));
     } catch (e) { setError(String(e)); }
   };
+  const loadOldNotifications = async () => {
+    if (!notificationCursor) return;
+    try {
+      setNotificationBusy(true);
+      const page = await getNotifications(token, { cursor: notificationCursor });
+      setNotifications(prev => mergeNotificationsById(prev, page.items));
+      setNotificationCursor(page.nextCursor);
+    } catch (e) { setError(String(e)); } finally { setNotificationBusy(false); }
+  };
+  const report = async (item: Message) => {
+    const reason = window.prompt('Lý do báo cáo tin nhắn:');
+    if (!reason?.trim()) return;
+    const description = window.prompt('Mô tả thêm (ít nhất 10 ký tự):');
+    if (!description || description.trim().length < 10) {
+      setError('Mô tả báo cáo phải có ít nhất 10 ký tự.');
+      return;
+    }
+    try {
+      await reportMessage(token, item.id, reason.trim(), description.trim());
+      setFeedback(`Đã gửi báo cáo cho tin nhắn ${item.id}.`);
+      setError('');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (/HTTP 404|HTTP 501/.test(message)) {
+        setError(`Yêu cầu báo cáo đã gửi đúng messageId ${item.id}, nhưng API xử lý báo cáo Message của TV5 chưa được tích hợp (lỗi ${message.match(/HTTP (404|501)/)?.[1]}).`);
+      } else setError(message);
+    }
+  };
   const active = conversations.find(x => x.id === current);
   const unread = notifications.filter(x => !x.readAt).length;
 
@@ -192,6 +299,8 @@ export function ChatPage({ token, userId, displayName }: Props) {
       </header>
       {error && <div role="alert" className="alert"><span>{error}</span>
         <button onClick={() => setError('')} aria-label="Đóng lỗi">✕</button></div>}
+      {feedback && <div role="status" className="feedback"><span>{feedback}</span>
+        <button onClick={() => setFeedback('')} aria-label="Đóng thông báo">✕</button></div>}
       <div className="layout">
         <aside className="conversations">
           <div className="section-heading"><h2>Hội thoại</h2><span>{conversations.length}</span></div>
@@ -214,7 +323,10 @@ export function ChatPage({ token, userId, displayName }: Props) {
             {messages.length === 0 && !busy && <div className="empty centered">Chưa có tin nhắn.</div>}
             {messages.map(m => <div key={m.id} className={`bubble-row ${m.senderId === userId ? 'mine' : ''}`}>
               <div className="bubble"><div className="bubble-text">{m.content}</div>
-                <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time></div></div>)}
+                <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
+                {m.senderId !== userId && <button type="button" className="report-message"
+                  onClick={() => void report(m)}>Báo cáo</button>}
+              </div></div>)}
             {pending.map(p => <div className="bubble-row mine" key={p.clientMessageId}>
               <div className="bubble pending"><div className="bubble-text">{p.content}</div>
                 <small>{p.status === 'sending' ? 'Đang gửi...' : 'Gửi thất bại'}</small>
@@ -237,6 +349,9 @@ export function ChatPage({ token, userId, displayName }: Props) {
               <small>{dateTime(item.createdAt)}</small>
               {!item.readAt && <button onClick={() => void read(item.id)}>Đánh dấu đã đọc</button>}
             </div>)}
+          {notificationCursor && <button className="older" onClick={() => void loadOldNotifications()} disabled={notificationBusy}>
+            {notificationBusy ? 'Đang tải…' : 'Tải thông báo cũ'}
+          </button>}
         </aside>
       </div>
     </main>

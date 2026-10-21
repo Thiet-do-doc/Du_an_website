@@ -6,62 +6,61 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace DatingApp.Api.Modules.ChatNotifications.Hubs;
 
-[Authorize]
-public class ChatHub(ChatService chats, IChatPermissions permissions) : Hub
+[Authorize(Policy = "User")]
+public sealed class ChatHub(ChatService chats, IChatPermissions permissions) : Hub
 {
     public override async Task OnConnectedAsync()
     {
         var userId = UserId();
-        if (!await permissions.IsUserActiveAsync(userId))
+        if (!await permissions.IsUserActiveAsync(userId, Context.ConnectionAborted))
         {
             Context.Abort();
-            return;
+            throw new HubException("Tài khoản không hoạt động hoặc chưa xác nhận email.");
         }
         await base.OnConnectedAsync();
     }
 
     public async Task JoinConversation(Guid conversationId)
     {
-        var access = await permissions.GetAccessAsync(conversationId, UserId());
+        ConversationAccess access;
+        try { access = await permissions.GetAccessAsync(conversationId, UserId(), Context.ConnectionAborted); }
+        catch (ChatDependencyUnavailableException e) { throw new HubException(e.Message); }
         if (!access.CanRead) throw new HubException("Không có quyền tham gia hội thoại.");
-        await Groups.AddToGroupAsync(Context.ConnectionId, Group(conversationId));
+        await Groups.AddToGroupAsync(Context.ConnectionId, Group(conversationId), Context.ConnectionAborted);
     }
 
     public Task LeaveConversation(Guid conversationId) =>
-        Groups.RemoveFromGroupAsync(Context.ConnectionId, Group(conversationId));
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, Group(conversationId), Context.ConnectionAborted);
 
     public async Task<MessageDto> SendMessage(Guid conversationId, string content, Guid clientMessageId)
     {
-        var userId = UserId();
+        var senderId = UserId();
         SendResult result;
         try
         {
-            result = await chats.SendMessageAsync(conversationId, userId, content, clientMessageId);
+            result = await chats.SendMessageAsync(conversationId, senderId, content, clientMessageId,
+                Context.ConnectionAborted);
         }
-        catch (ChatDomainException e)
-        {
-            throw new HubException(e.Message);
-        }
+        catch (ChatDomainException e) { throw new HubException(e.Message); }
+        catch (ChatDependencyUnavailableException e) { throw new HubException(e.Message); }
 
-        // Message goes directly to approved users, NEVER to a stale group membership.
-        // A group is not an authorization boundary: a user can be blocked mid-connection.
-        if (result.IsNew)
+        // Re-check permission after the write. Conversation groups are not an authorization boundary:
+        // a block/lock/unmatch may happen while this Hub connection remains open.
+        var accessAfterWrite = await permissions.GetAccessAsync(conversationId, senderId, Context.ConnectionAborted);
+        if (accessAfterWrite.CanRead && await permissions.IsUserActiveAsync(result.PartnerId, Context.ConnectionAborted))
         {
-            var access = await permissions.GetAccessAsync(conversationId, userId);
-            if (access.CanRead && await permissions.IsUserActiveAsync(result.PartnerId))
-            {
-                await Clients.User(userId.ToString()).SendAsync("MessageCreated", result.Message);
-                await Clients.User(result.PartnerId.ToString()).SendAsync("MessageCreated", result.Message);
-                if (result.Notification is not null)
-                    await Clients.User(result.PartnerId.ToString())
-                        .SendAsync("NotificationCreated", result.Notification);
-            }
+            // Re-publishing an idempotent retry is safe: clients merge by server Message.Id and notification.Id.
+            await Clients.User(senderId.ToString()).SendAsync("MessageCreated", result.Message, Context.ConnectionAborted);
+            await Clients.User(result.PartnerId.ToString()).SendAsync("MessageCreated", result.Message, Context.ConnectionAborted);
+            if (result.Notification is not null)
+                await Clients.User(result.PartnerId.ToString()).SendAsync("NotificationCreated", result.Notification,
+                    Context.ConnectionAborted);
         }
-        // Invoke return value doubles as the sender's acknowledgement (idempotent retry).
-        return result.Message;
+        return result.Message; // invocation ACK only represents a database-committed message
     }
 
-    private Guid UserId() => Guid.TryParse(Context.User?.FindFirstValue(ClaimTypes.NameIdentifier),
-        out var value) ? value : throw new HubException("Phiên đăng nhập không hợp lệ.");
+    private Guid UserId() => Guid.TryParse(Context.User?.FindFirstValue(ClaimTypes.NameIdentifier), out var id)
+        ? id : throw new HubException("Phiên đăng nhập không hợp lệ.");
+
     private static string Group(Guid id) => $"conversation:{id:N}";
 }

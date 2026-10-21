@@ -1,4 +1,5 @@
 # Dependencies and generated builds
+.artifacts/
 **/node_modules/
 **/dist/
 **/bin/
@@ -34,3 +35,6 @@ Thumbs.db
 *.backup
 *.log
 *.zip
+
+# Local TV4 load-test reports (attach sanitized evidence intentionally).
+frontend/test-results/

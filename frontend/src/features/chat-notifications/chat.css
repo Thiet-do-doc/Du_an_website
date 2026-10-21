@@ -55,6 +55,9 @@ h2 { margin: 0; font-size: 15px; }
 .notice b { font-size: 12px; }
 .notice small { color: #6a8694; font-size: 11px; }
 .notice button { background: none; border: 0; text-align: left; color: #1e788f; font-weight: 700; font-size: 11px; padding: 4px 0; }
+.report-message { display: block; margin: 5px 0 0 auto; padding: 2px 0; border: 0; background: transparent; color: inherit; text-decoration: underline; font-size: 10px; opacity: .82; }
+.feedback { margin: 0 auto 12px; padding: 12px 15px; background: #e8f7ef; border: 1px solid #b9e6ce; border-radius: 10px; display: flex; justify-content: space-between; gap: 10px; max-width: 1280px; font-size: 13px; color: #1f6847; }
+.feedback button { border: 0; background: transparent; color: inherit; }
 .empty { padding: 8px; color: #778e9b; font-size: 13px; line-height: 1.6; }
 .centered { text-align: center; padding: 60px 0; }
 .older { margin: 0 auto 20px; display: block; border: 1px solid #afd4e0; border-radius: 20px; padding: 6px 12px; color: #1b738b; background: #fff; }

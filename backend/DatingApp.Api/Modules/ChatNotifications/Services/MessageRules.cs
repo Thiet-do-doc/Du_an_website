@@ -4,11 +4,13 @@ public static class MessageRules
 {
     public static string Validate(string? content, Guid clientMessageId)
     {
+        var trimmed = content?.Trim() ?? string.Empty;
         if (clientMessageId == Guid.Empty)
-            throw new ChatDomainException(400, "clientMessageId không hợp lệ.");
-        var normalized = content?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > 2000)
-            throw new ChatDomainException(400, "Tin nhắn phải có 1–2000 ký tự.");
-        return normalized;
+            throw new ChatDomainException(400, "clientMessageId phải là UUID hợp lệ.");
+        if (trimmed.Length == 0)
+            throw new ChatDomainException(400, "Tin nhắn không được để trống.");
+        if (trimmed.Length > 2000)
+            throw new ChatDomainException(400, "Tin nhắn không được vượt quá 2000 ký tự.");
+        return trimmed;
     }
 }

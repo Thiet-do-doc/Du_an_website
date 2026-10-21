@@ -30,6 +30,7 @@ export type ChatNotification = {
   id: string;
   type: 'match' | 'newMessage';
   targetId: string;
+  conversationId: string;
   createdAt: string;
   readAt: string | null;
 };
@@ -38,5 +39,7 @@ export type NotificationPage = {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  nextCursor: string | null;
+  nextAfterId: string | null;
 };
 export type Delivery = { clientMessageId: string; content: string; status: 'sending' | 'failed' };
