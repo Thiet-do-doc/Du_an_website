@@ -41,7 +41,7 @@ export default function App() {
 
   return <>
     <header className="topbar"><div className="container app-width d-flex justify-content-between align-items-center">
-      <span className="brand">Dating<span>App</span></span><div className="d-flex gap-3"><a href="/profile">Hồ sơ</a><a href="/account">Tài khoản</a></div>
+      <span className="brand">Dating<span>App</span></span><div className="d-flex gap-3"><a href="/blocks">Chặn người dùng</a><a href="/profile">Hồ sơ</a><a href="/account">Tài khoản</a></div>
     </div></header>
     <main className="container app-width">
       <section className="intro">

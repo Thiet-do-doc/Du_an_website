@@ -21,3 +21,9 @@ Các API profile/match/chat nghiệp vụ chưa có.
 Quy ước: camelCase cho JSON, UTC cho thời gian, UUID cho định danh; DTO không trả
 password hash, token bí mật hoặc ngày sinh của người khác. API nghiệp vụ sẽ dùng
 Problem Details cho lỗi; health readiness là ngoại lệ có body health riêng.
+
+
+## Tuần 2 — Block (#21)
+
+GET/POST/DELETE `/api/v1/blocks`: JWT + CurrentUser Guid theo hợp đồng chung.
+Chi tiết DTO, status, quy tắc hai chiều và ví dụ ghép module: [ISSUE_21_HANDOFF.md](ISSUE_21_HANDOFF.md).

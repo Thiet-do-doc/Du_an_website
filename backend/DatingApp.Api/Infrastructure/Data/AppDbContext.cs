@@ -9,6 +9,9 @@ namespace DatingApp.Api.Infrastructure.Data;
 public sealed class AppDbContext
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
+    public DbSet<DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock> Blocks => Set<DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock>();
+    public DbSet<DatingApp.Api.Modules.SafetyAdmin.Entities.UserReport> Reports => Set<DatingApp.Api.Modules.SafetyAdmin.Entities.UserReport>();
+    public DbSet<DatingApp.Api.Modules.SafetyAdmin.Entities.ModerationAction> ModerationActions => Set<DatingApp.Api.Modules.SafetyAdmin.Entities.ModerationAction>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Profile> Profiles => Set<Profile>();
     public DbSet<Photo> Photos => Set<Photo>();

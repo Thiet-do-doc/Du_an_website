@@ -1,3 +1,5 @@
+using DatingApp.Api.Modules.SafetyAdmin.Services;
+using System.Text.Json.Serialization;
 using DatingApp.Api.Infrastructure.Data;
 using DatingApp.Api.Modules.Auth.Entities;
 using DatingApp.Api.Modules.SystemHealth.Services;
@@ -15,7 +17,9 @@ using DatingApp.Api.Modules.Profiles.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Đăng ký controller, xử lý lỗi và tài liệu API.
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddScoped<IBlockPolicy, BlockPolicy>();
+builder.Services.AddScoped<IAccountStatusService, AccountStatusService>();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
 builder.Services.AddOpenApi();
