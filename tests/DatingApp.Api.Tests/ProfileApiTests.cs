@@ -60,7 +60,7 @@ public sealed partial class AuthFlowTests
         var ownershipAttempt = await owner.PutApi("profiles/me", new
         {
             userId = otherAccount.Id, displayName = "Không được sửa hồ sơ B", bio = "", city = "Hà Nội",
-            gender = "Nữ", isDiscoverable = true, interestIds = new[] { SampleInterests[0] }
+            gender = "Nữ", isDiscoverable = true, interestIds = new[] { SampleInterests[1], SampleInterests[2] }
         }, ownerToken);
         Assert.Equal(HttpStatusCode.OK, ownershipAttempt.StatusCode);
         Assert.Equal(ownerAccount.Id,
