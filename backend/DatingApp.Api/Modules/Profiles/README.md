@@ -24,9 +24,12 @@ khi lưu trong PostgreSQL (`bytea`). Không phụ thuộc thư mục local hay d
 bên ngoài. Khi triển khai tải ảnh lớn, nhóm có thể chuyển nội dung sang object
 storage qua adapter riêng.
 
-`IDiscoveryProfileQuery` cung cấp `ProfileSummary` và `IsCompleteAsync`. Hồ sơ
-được xem là hoàn thiện khi tài khoản hoạt động, đã xác nhận email, đủ 18 tuổi,
-có tên hiển thị, ít nhất một ảnh và ít nhất một sở thích.
+`IDiscoveryProfileQuery` cung cấp hồ sơ công khai, kiểm tra độ hoàn thiện, tìm
+kiếm theo độ tuổi/thành phố/sở thích và tải theo danh sách UUID cho Discovery.
+Truy vấn loại tài khoản khóa/chưa xác nhận, hồ sơ ẩn/chưa hoàn thiện và không
+trả ngày sinh. Hồ sơ được xem là hoàn thiện khi tài khoản hoạt động, đã xác nhận
+email, đủ 18 tuổi, có tên hiển thị và ít nhất một sở thích. Ảnh là tùy chọn;
+giao diện Discovery có thể dùng avatar mặc định khi hồ sơ chưa có ảnh.
 
 Không trả email hoặc ngày sinh đầy đủ trong DTO hồ sơ. Migration được tạo nhưng
 chưa áp dụng lên cơ sở dữ liệu; hãy review SQL và phối hợp thứ tự với TV1 trước

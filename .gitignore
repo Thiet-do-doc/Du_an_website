@@ -1,5 +1,6 @@
 # Dependencies and generated builds
 .artifacts/
+.dotnet_cli/
 **/node_modules/
 **/dist/
 **/bin/
