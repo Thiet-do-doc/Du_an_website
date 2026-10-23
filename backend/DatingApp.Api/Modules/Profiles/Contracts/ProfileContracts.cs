@@ -12,3 +12,4 @@ public sealed record InterestResponse(Guid Id, string Name);
 public sealed record ReorderPhotosRequest(IReadOnlyCollection<Guid> PhotoIds);
 public sealed record ProfileSummary(Guid UserId, string DisplayName, int Age, string? Bio, string? City,
     IReadOnlyCollection<string> Interests, string? AvatarUrl);
+public sealed record ProfileSearchCriteria(int Page, int PageSize, int? MinAge, int? MaxAge, string? City, string? Interest);
