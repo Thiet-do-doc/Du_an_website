@@ -161,3 +161,10 @@ nội dung bộ khung vào repo đó, giữ `.git`, tạo nhánh và gửi PR. K
 - https://learn.microsoft.com/aspnet/core/fundamentals/openapi/overview?view=aspnetcore-10.0
 - https://www.npgsql.org/efcore/
 - https://learn.microsoft.com/dotnet/core/tools/global-json
+
+
+## Khuyến — issue #21
+
+UI chặn thật: `/blocks` sau khi đăng nhập. Xem [bàn giao #21](docs/ISSUE_21_HANDOFF.md)
+và [khung vận hành](infra/OPERATIONS.md). Dùng migration chung mới nhất, không áp migration
+SafetyAdmin cũ tạo Identity string. Chat/discovery cần ghép IBlockPolicy trước khi xác nhận chặn toàn hệ thống.

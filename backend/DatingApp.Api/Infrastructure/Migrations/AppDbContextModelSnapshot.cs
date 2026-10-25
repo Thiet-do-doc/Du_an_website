@@ -393,6 +393,110 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.ToTable("UserInterests");
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.ModerationAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ModerationActions");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock", b =>
+                {
+                    b.Property<Guid>("BlockerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocker_user_id");
+
+                    b.Property<Guid>("BlockedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocked_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("BlockerUserId", "BlockedUserId");
+
+                    b.HasIndex("BlockedUserId");
+
+                    b.ToTable("user_blocks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_user_blocks_no_self_block", "blocker_user_id <> blocked_user_id");
+                        });
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.UserReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReporterUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReviewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TargetType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetUserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Reports");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -630,6 +734,21 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Navigation("Interest");
 
                     b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("BlockedUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("BlockerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
