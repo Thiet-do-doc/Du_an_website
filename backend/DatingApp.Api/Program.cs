@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
 using DatingApp.Api.Modules.Profiles.Services;
+using DatingApp.Api.Modules.DiscoveryMatching.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,9 +26,6 @@ if (builder.Configuration["DataProtection:KeyPath"] is string keyPath)
     builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keyPath));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
-builder.Services.AddScoped<ProfileService>();
-builder.Services.AddScoped<PhotoService>();
-builder.Services.AddScoped<IDiscoveryProfileQuery>(sp => sp.GetRequiredService<ProfileService>());
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AuthConnectionRegistry>();
 builder.Services.AddSignalR(options => options.AddFilter<AccountHubFilter>());
@@ -65,6 +63,15 @@ if (!string.IsNullOrWhiteSpace(connectionString))
         throw new InvalidOperationException("Production phải cấu hình Email:SmtpHost và thông tin SMTP bằng secret.");
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(connectionString));
+    builder.Services.AddScoped<ProfileService>();
+    builder.Services.AddScoped<PhotoService>();
+    builder.Services.AddScoped<DatingApp.Api.Modules.Profiles.Services.IDiscoveryProfileQuery>(sp => sp.GetRequiredService<ProfileService>());
+    builder.Services.AddScoped<DiscoveryProfileQueryAdapter>();
+    builder.Services.AddScoped<IMatchService, MatchService>();
+    builder.Services.AddScoped<DiscoveryService>();
+    builder.Services.AddScoped<IBlockLookup, UnconfiguredBlockLookup>();
+    builder.Services.AddScoped<IMatchConversationBridge, UnconfiguredMatchConversationBridge>();
+    builder.Services.AddScoped<DatingApp.Api.Modules.DiscoveryMatching.Services.IDiscoveryProfileQuery, DiscoveryProfileQueryAdapter>();
 
     // Đăng ký dịch vụ quản lý tài khoản.
     builder.Services

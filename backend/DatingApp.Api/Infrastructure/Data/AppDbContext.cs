@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using DatingApp.Api.Modules.Profiles.Entities;
+using DatingApp.Api.Modules.DiscoveryMatching.Entities;
 
 namespace DatingApp.Api.Infrastructure.Data;
 
@@ -14,6 +15,9 @@ public sealed class AppDbContext
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<Interest> Interests => Set<Interest>();
     public DbSet<UserInterest> UserInterests => Set<UserInterest>();
+    public DbSet<UserLike> UserLikes => Set<UserLike>();
+    public DbSet<Pass> Passes => Set<Pass>();
+    public DbSet<Match> Matches => Set<Match>();
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {

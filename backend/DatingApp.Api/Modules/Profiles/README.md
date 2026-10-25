@@ -38,6 +38,12 @@ nhưng chỉ hợp đồng riêng tư có cờ bật khám phá và trạng thá
 Test tích hợp PostgreSQL tạo tài khoản và hồ sơ giả riêng cho lần chạy. Không
 seed hồ sơ người dùng vào migration hoặc môi trường production. Dùng tuổi, thành
 phố và danh sách sở thích khác nhau để kiểm tra bộ lọc discovery.
+`IDiscoveryProfileQuery` cung cấp hồ sơ công khai, kiểm tra độ hoàn thiện, tìm
+kiếm theo độ tuổi/thành phố/sở thích và tải theo danh sách UUID cho Discovery.
+Truy vấn loại tài khoản khóa/chưa xác nhận, hồ sơ ẩn/chưa hoàn thiện và không
+trả ngày sinh. Hồ sơ được xem là hoàn thiện khi tài khoản hoạt động, đã xác nhận
+email, đủ 18 tuổi, có tên hiển thị và ít nhất một sở thích. Ảnh là tùy chọn;
+giao diện Discovery có thể dùng avatar mặc định khi hồ sơ chưa có ảnh.
 
 Không trả email hoặc ngày sinh đầy đủ trong DTO hồ sơ. Migration được tạo nhưng
 chưa áp dụng lên cơ sở dữ liệu; hãy review SQL và phối hợp thứ tự với TV1 trước

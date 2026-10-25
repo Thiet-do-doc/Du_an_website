@@ -8,7 +8,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace DatingApp.Api.Infrastructure.Migrations
+namespace DatingApp.Api.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
     partial class AppDbContextModelSnapshot : ModelSnapshot
@@ -134,6 +134,80 @@ namespace DatingApp.Api.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.Match", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("MatchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UnmatchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserHighId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserLowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserHighId", "UnmatchedAt");
+
+                    b.HasIndex("UserLowId", "UnmatchedAt");
+
+                    b.HasIndex("UserLowId", "UserHighId")
+                        .IsUnique();
+
+                    b.ToTable("Matches", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Matches_UserOrder", "\"UserLowId\" < \"UserHighId\"");
+                        });
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.Pass", b =>
+                {
+                    b.Property<Guid>("FromUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ToUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("FromUserId", "ToUserId");
+
+                    b.HasIndex("ToUserId");
+
+                    b.ToTable("Passes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Passes_NoSelfPass", "\"FromUserId\" <> \"ToUserId\"");
+                        });
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.UserLike", b =>
+                {
+                    b.Property<Guid>("FromUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ToUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("FromUserId", "ToUserId");
+
+                    b.HasIndex("ToUserId", "FromUserId");
+
+                    b.ToTable("UserLikes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_UserLikes_NoSelfLike", "\"FromUserId\" <> \"ToUserId\"");
+                        });
                 });
 
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Interest", b =>
@@ -458,6 +532,63 @@ namespace DatingApp.Api.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.Match", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "HighUser")
+                        .WithMany()
+                        .HasForeignKey("UserHighId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "LowUser")
+                        .WithMany()
+                        .HasForeignKey("UserLowId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("HighUser");
+
+                    b.Navigation("LowUser");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.Pass", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "FromUser")
+                        .WithMany()
+                        .HasForeignKey("FromUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "ToUser")
+                        .WithMany()
+                        .HasForeignKey("ToUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FromUser");
+
+                    b.Navigation("ToUser");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.UserLike", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "FromUser")
+                        .WithMany()
+                        .HasForeignKey("FromUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "ToUser")
+                        .WithMany()
+                        .HasForeignKey("ToUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FromUser");
+
+                    b.Navigation("ToUser");
                 });
 
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Photo", b =>
