@@ -1,19 +1,30 @@
 using DatingApp.Api.Modules.Auth.Entities;
+using DatingApp.Api.Modules.ChatNotifications.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using DatingApp.Api.Modules.Profiles.Entities;
+using DatingApp.Api.Modules.DiscoveryMatching.Entities;
 
 namespace DatingApp.Api.Infrastructure.Data;
 
 public sealed class AppDbContext
     : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
+    public DbSet<DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock> Blocks => Set<DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock>();
+    public DbSet<DatingApp.Api.Modules.SafetyAdmin.Entities.UserReport> Reports => Set<DatingApp.Api.Modules.SafetyAdmin.Entities.UserReport>();
+    public DbSet<DatingApp.Api.Modules.SafetyAdmin.Entities.ModerationAction> ModerationActions => Set<DatingApp.Api.Modules.SafetyAdmin.Entities.ModerationAction>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Profile> Profiles => Set<Profile>();
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<Interest> Interests => Set<Interest>();
     public DbSet<UserInterest> UserInterests => Set<UserInterest>();
+    public DbSet<UserLike> UserLikes => Set<UserLike>();
+    public DbSet<Pass> Passes => Set<Pass>();
+    public DbSet<Match> Matches => Set<Match>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<ChatMessage> Messages => Set<ChatMessage>();
+    public DbSet<AppNotification> Notifications => Set<AppNotification>();
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {

@@ -1,3 +1,5 @@
+> Cập nhật 26/10/2026: các module đã được nối trong bản tích hợp. Xem [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md) cho schema và hành vi hiện hành. Nội dung bàn giao bên dưới được giữ để đối chiếu lịch sử.
+
 # Đưa module của từng thành viên vào nền chung của Thiết
 
 Nền chung gồm bộ khung 357db46, Auth b3e85c4 và phần Auth hoàn chỉnh từ máy Thiết.
