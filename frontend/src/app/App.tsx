@@ -41,7 +41,7 @@ export default function App() {
 
   return <>
     <header className="topbar"><div className="container app-width d-flex justify-content-between align-items-center">
-      <span className="brand">Dating<span>App</span></span><div className="d-flex gap-3"><a href="/blocks">Chặn</a><a href="/chat">Chat</a><a href="/discover">Khám phá</a><a href="/profile">Hồ sơ</a><a href="/account">Tài khoản</a></div>
+      <span className="brand">Dating<span>App</span></span><div className="d-flex gap-3"><a href="/safety">An toàn</a><a href="/chat">Chat</a><a href="/discover">Khám phá</a><a href="/profile">Hồ sơ</a><a href="/account">Tài khoản</a></div>
     </div></header>
     <main className="container app-width">
       <section className="intro">
@@ -57,7 +57,7 @@ export default function App() {
         <p className="hint">Backend có thể chạy trước khi cấu hình database. Xem README.md để hoàn tất kết nối PostgreSQL.</p>
       </section>
       <section className="module-section" aria-labelledby="module-heading">
-        <div className="section-heading"><h2 id="module-heading">Phần việc của nhóm</h2><span>Các module đang chờ triển khai</span></div>
+        <div className="section-heading"><h2 id="module-heading">Phần việc của nhóm</h2><span>Các module trong bản tích hợp</span></div>
         <div className="module-grid">{modules.map(([id, title, owner, folder, backup]) =>
           <article className="module-card" key={id}>
             <div className="d-flex justify-content-between"><span className="module-number">{id}</span><span className="owner">{owner}</span></div>

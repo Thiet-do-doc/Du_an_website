@@ -119,7 +119,7 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
         if (interestFilter is not null)
             query = query.Where(x => x.UserInterests.Any(i => EF.Functions.ILike(i.Interest.Name, interestFilter)));
 
-        var skip = checked((criteria.Page - 1) * criteria.PageSize);
+        var skip = criteria.Offset ?? checked((criteria.Page - 1) * criteria.PageSize);
         var profiles = await query.OrderBy(x => x.DisplayName).ThenBy(x => x.UserId)
             .Skip(skip).Take(criteria.PageSize)
             .Select(x => new ProfileSummaryRow(x.UserId, x.DisplayName, x.Bio, x.City, x.User.DateOfBirth))

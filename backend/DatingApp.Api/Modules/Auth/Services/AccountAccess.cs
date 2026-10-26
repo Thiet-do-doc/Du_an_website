@@ -48,8 +48,9 @@ public sealed class AccountAccess(AppDbContext db, UserManager<ApplicationUser> 
     }
     public async Task<bool> SetActiveAsync(Guid userId, bool active, CancellationToken cancellationToken = default)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        db.ChangeTracker.Clear();
+        // Join moderation's transaction so the status, revocation and audit commit together.
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
         var user = (await db.Users.FromSqlInterpolated($"SELECT * FROM \"AspNetUsers\" WHERE \"Id\" = {userId} FOR UPDATE")
             .ToListAsync(cancellationToken)).SingleOrDefault();
         if (user is null) return false;
@@ -59,8 +60,11 @@ public sealed class AccountAccess(AppDbContext db, UserManager<ApplicationUser> 
         await db.RefreshTokens.Where(x => x.UserId == userId && x.RevokedAtUtc == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAtUtc, DateTimeOffset.UtcNow), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        connections.Disconnect(userId);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            connections.Disconnect(userId);
+        }
         return true;
     }
 }

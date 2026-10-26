@@ -16,10 +16,11 @@ const request = <T,>(path: string, init: RequestInit = {}) => authenticatedFetch
 
 export default function SafetyAdminPanel() {
   const [targetType, setTargetType] = useState<ReportType>('User');
-  const [targetId, setTargetId] = useState('');
+  const [targetId, setTargetId] = useState(new URLSearchParams(location.search).get('user') ?? '');
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
-  const [blockTarget, setBlockTarget] = useState('');
+  const [blockTarget, setBlockTarget] = useState(new URLSearchParams(location.search).get('user') ?? '');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [selected, setSelected] = useState<Report | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
@@ -31,7 +32,8 @@ export default function SafetyAdminPanel() {
     try { setReports(await request<Report[]>('/api/v1/admin/reports?status=Pending')); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Không tải được danh sách báo cáo.'); }
   }, []);
-  useEffect(() => { void loadReports(); }, [loadReports]);
+  useEffect(() => { void request<{ roles: string[] }>('/api/v1/auth/me').then(me => setIsAdmin(me.roles.includes('Admin'))).catch(() => setIsAdmin(false)); }, []);
+  useEffect(() => { if (isAdmin) void loadReports(); }, [isAdmin, loadReports]);
 
   async function submitReport(event: FormEvent) {
     event.preventDefault(); setBusy(true); setMessage('');
@@ -68,14 +70,14 @@ export default function SafetyAdminPanel() {
       await request(`/api/v1/admin/users/${encodeURIComponent(selected.targetUserId)}/status`, {
         method: 'PATCH', body: JSON.stringify({ isActive, reason: accountReason }),
       });
-      setAccountReason(''); setMessage(isActive ? 'Đã mở tài khoản.' : 'Đã khóa tài khoản và cập nhật security stamp.');
+      setAccountReason(''); setMessage(isActive ? 'Đã mở tài khoản.' : 'Đã khóa tài khoản và thu hồi các phiên đăng nhập.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Không cập nhật được tài khoản.'); }
     finally { setBusy(false); }
   }
 
   return <section className="safety-panel" aria-labelledby="safety-heading">
     <p className="eyebrow">AN TOÀN CỘNG ĐỒNG</p><h2 id="safety-heading">Chặn và báo cáo</h2>
-    <p className="safety-note">Nhập ID người dùng, tin nhắn hoặc bài viết cần xử lý. Không gửi nội dung chat riêng vào phần mô tả.</p>
+    <p className="safety-note">Nhập ID người dùng hoặc tin nhắn cần xử lý. Không gửi nội dung chat riêng vào phần mô tả.</p>
     <div className="safety-grid">
       <form className="safety-card" onSubmit={event => void changeBlock(event, 'block')}>
         <h3>Chặn người dùng</h3><label>ID người dùng<input required value={blockTarget} onChange={e => setBlockTarget(e.target.value)} /></label>
@@ -85,7 +87,7 @@ export default function SafetyAdminPanel() {
       <form className="safety-card" onSubmit={submitReport}>
         <h3>Gửi báo cáo</h3>
         <label>Đối tượng<select value={targetType} onChange={e => setTargetType(e.target.value as ReportType)}>
-          <option value="User">Người dùng</option><option value="Message">Tin nhắn</option><option value="Post">Bài viết</option>
+          <option value="User">Người dùng</option><option value="Message">Tin nhắn</option>
         </select></label>
         <label>ID đối tượng<input required maxLength={200} value={targetId} onChange={e => setTargetId(e.target.value)} /></label>
         <label>Lý do<select required value={reason} onChange={e => setReason(e.target.value)}>
@@ -95,7 +97,7 @@ export default function SafetyAdminPanel() {
         <button className="btn btn-dark" disabled={busy}>Gửi báo cáo</button>
       </form>
     </div>
-    <div className="admin-area">
+    {isAdmin && <div className="admin-area">
       <div className="panel-heading"><div><p className="eyebrow">DÀNH CHO ADMIN</p><h3>Báo cáo đang chờ</h3></div>
         <button className="btn btn-outline-secondary" onClick={() => void loadReports()}>Tải lại</button></div>
       {reports.length === 0 ? <p>Không có báo cáo chờ hoặc tài khoản chưa được cấp quyền Admin.</p> :
@@ -116,7 +118,7 @@ export default function SafetyAdminPanel() {
             <button className="btn btn-outline-secondary" disabled={busy || accountReason.trim().length < 5} onClick={() => void setAccountActive(true)}>Mở tài khoản</button></>}
         </div>
       </article>}
-    </div>
+    </div>}
     <p aria-live="polite" className="safety-message">{message}</p>
   </section>;
 }

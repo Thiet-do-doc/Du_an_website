@@ -1,4 +1,5 @@
 using DatingApp.Api.Modules.Auth.Entities;
+using DatingApp.Api.Modules.ChatNotifications.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,9 @@ public sealed class AppDbContext
     public DbSet<UserLike> UserLikes => Set<UserLike>();
     public DbSet<Pass> Passes => Set<Pass>();
     public DbSet<Match> Matches => Set<Match>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<ChatMessage> Messages => Set<ChatMessage>();
+    public DbSet<AppNotification> Notifications => Set<AppNotification>();
     public AppDbContext(DbContextOptions<AppDbContext> options)
         : base(options)
     {

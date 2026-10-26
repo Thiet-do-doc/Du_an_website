@@ -1,3 +1,4 @@
+import { PrivatePhoto } from './PrivatePhoto';
 import { useCallback, useEffect, useState } from 'react';
 import { ProtectedRoute } from '../auth/AuthProvider';
 import { deletePhoto, getInterests, getMyProfile, reorderPhotos, saveProfile, setAvatar, uploadPhoto } from './api';
@@ -62,7 +63,7 @@ function ProfileEditor() {
     <section className="profile-card" aria-labelledby="photos-heading"><div className="profile-section-head"><div><h2 id="photos-heading">Ảnh của bạn</h2><p>Tối đa 6 ảnh · JPEG, PNG hoặc WebP · tối đa 5 MB mỗi ảnh</p></div>
       <label className="btn btn-outline-dark upload-label">Thêm ảnh<input type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} disabled={busy || (profile?.photos.length ?? 0) >= 6} /></label></div>
       <div className="photo-grid">{profile?.photos.length ? [...profile.photos].sort((a, b) => a.sortOrder - b.sortOrder).map((photo, i) => <article className="photo-item" key={photo.id}>
-        <img src={photo.url} alt={photo.isAvatar ? 'Ảnh đại diện' : `Ảnh hồ sơ ${i + 1}`} />{photo.isAvatar && <span className="avatar-label">Ảnh đại diện</span>}
+        <PrivatePhoto src={photo.url} alt={photo.isAvatar ? 'Ảnh đại diện' : `Ảnh hồ sơ ${i + 1}`} />{photo.isAvatar && <span className="avatar-label">Ảnh đại diện</span>}
         <div className="photo-actions"><button type="button" onClick={() => void run(() => setAvatar(photo.id), 'Đã chọn ảnh đại diện.')} disabled={busy || photo.isAvatar}>Chọn đại diện</button>
           <button type="button" onClick={() => void move(i, -1)} disabled={busy || i === 0} aria-label="Chuyển ảnh lên trước">↑</button>
           <button type="button" onClick={() => void move(i, 1)} disabled={busy || i === (profile.photos.length - 1)} aria-label="Chuyển ảnh xuống sau">↓</button>

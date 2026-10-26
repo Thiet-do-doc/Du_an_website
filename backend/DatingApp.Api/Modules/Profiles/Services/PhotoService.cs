@@ -105,9 +105,10 @@ public sealed class PhotoService(AppDbContext db)
         return true;
     }
 
-    public async Task<Photo?> GetContentAsync(Guid photoId, CancellationToken ct) =>
+    public async Task<Photo?> GetContentAsync(Guid photoId, Guid viewerId, CancellationToken ct) =>
         await db.Photos.Include(x => x.Profile).ThenInclude(x => x.User)
-            .SingleOrDefaultAsync(x => x.Id == photoId && x.Profile.IsDiscoverable && x.Profile.User.IsActive && x.Profile.User.EmailConfirmed, ct);
+            .SingleOrDefaultAsync(x => x.Id == photoId && (x.UserId == viewerId || x.Profile.IsDiscoverable)
+                && x.Profile.User.IsActive && x.Profile.User.EmailConfirmed, ct);
 }
 
 public sealed class PhotoValidationException(string message) : Exception(message);

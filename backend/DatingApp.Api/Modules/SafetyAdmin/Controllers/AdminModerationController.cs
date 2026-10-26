@@ -10,10 +10,10 @@ using Microsoft.EntityFrameworkCore;
 namespace DatingApp.Api.Modules.SafetyAdmin.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "Admin")]
 [Route("api/v1/admin")]
 public sealed class AdminModerationController(
-    AppDbContext db, IAccountStatusService accountStatus) : ControllerBase
+    AppDbContext db, IAccountAccess accountAccess, AuthConnectionRegistry connections) : ControllerBase
 {
     [HttpGet("reports")]
     public async Task<ActionResult<IReadOnlyList<ReportResponse>>> ListReports(
@@ -71,9 +71,7 @@ public sealed class AdminModerationController(
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
         var reason = request.Reason.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var status = await accountStatus.SetActiveAsync(id, request.IsActive, cancellationToken);
-        if (!status.Found) return NotFound();
-        if (!status.Succeeded) return BadRequest(new { errors = status.Errors });
+        if (!await accountAccess.SetActiveAsync(userId, request.IsActive, cancellationToken)) return NotFound();
         var action = new ModerationAction
         {
             Id = Guid.NewGuid(), ActorUserId = actorId, TargetUserId = id,
@@ -82,6 +80,7 @@ public sealed class AdminModerationController(
         db.ModerationActions.Add(action);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        connections.Disconnect(userId);
         return Ok(new ModerationActionResponse(action.Id, action.ReportId, action.ActorUserId,
             action.TargetUserId, action.Action, action.Reason, action.CreatedAtUtc));
     }

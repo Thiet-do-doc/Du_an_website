@@ -3,6 +3,9 @@ using System.Text.Json.Serialization;
 using DatingApp.Api.Infrastructure.Data;
 using DatingApp.Api.Modules.Auth.Entities;
 using DatingApp.Api.Modules.SystemHealth.Services;
+using DatingApp.Api.Modules.DiscoveryMatching.Services;
+using DatingApp.Api.Modules.ChatNotifications.Services;
+using DatingApp.Api.Modules.ChatNotifications.Hubs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using DatingApp.Api.Modules.Auth.Services;
@@ -13,14 +16,12 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
 using DatingApp.Api.Modules.Profiles.Services;
-using DatingApp.Api.Modules.DiscoveryMatching.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Đăng ký controller, xử lý lỗi và tài liệu API.
 builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddScoped<IBlockPolicy, BlockPolicy>();
-builder.Services.AddScoped<IAccountStatusService, AccountStatusService>();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
 builder.Services.AddOpenApi();
@@ -33,6 +34,14 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AuthConnectionRegistry>();
 builder.Services.AddSignalR(options => options.AddFilter<AccountHubFilter>());
+builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<IChatReportTargetAccess, ChatReportTargetAccess>();
+builder.Services.AddScoped<MatchChatBridge>();
+builder.Services.AddScoped<IMatchConversationBridge, MatchChatBridge>();
+builder.Services.AddScoped<IChatMatchAccess, IntegratedChatMatchAccess>();
+builder.Services.AddScoped<IChatBlockPolicy, IntegratedChatBlockPolicy>();
+builder.Services.AddScoped<IChatPermissions, ChatPermissions>();
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -73,8 +82,7 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     builder.Services.AddScoped<DiscoveryProfileQueryAdapter>();
     builder.Services.AddScoped<IMatchService, MatchService>();
     builder.Services.AddScoped<DiscoveryService>();
-    builder.Services.AddScoped<IBlockLookup, UnconfiguredBlockLookup>();
-    builder.Services.AddScoped<IMatchConversationBridge, UnconfiguredMatchConversationBridge>();
+    builder.Services.AddScoped<IBlockLookup, DiscoveryBlockLookup>();
     builder.Services.AddScoped<DatingApp.Api.Modules.DiscoveryMatching.Services.IDiscoveryProfileQuery, DiscoveryProfileQueryAdapter>();
 
     // Đăng ký dịch vụ quản lý tài khoản.
@@ -185,6 +193,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat", options => options.CloseOnAuthenticationExpiration = true);
 
 app.Run();
 

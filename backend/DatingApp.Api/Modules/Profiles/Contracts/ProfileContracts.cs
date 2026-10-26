@@ -17,4 +17,4 @@ public sealed record PublicProfileResponse(Guid UserId, string DisplayName, int 
 public sealed record PhotoResponse(Guid Id, string Url, bool IsAvatar, int SortOrder);
 public sealed record InterestResponse(Guid Id, string Name);
 public sealed record ReorderPhotosRequest(IReadOnlyCollection<Guid> PhotoIds);
-public sealed record ProfileSearchCriteria(int Page, int PageSize, int? MinAge, int? MaxAge, string? City, string? Interest);
+public sealed record ProfileSearchCriteria(int Page, int PageSize, int? MinAge, int? MaxAge, string? City, string? Interest, int? Offset = null);

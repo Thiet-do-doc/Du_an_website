@@ -1,3 +1,5 @@
+> Cập nhật 26/10/2026: các module đã được nối trong bản tích hợp. Xem [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md) cho schema và hành vi hiện hành. Nội dung bàn giao bên dưới được giữ để đối chiếu lịch sử.
+
 # Hợp đồng API hiện có
 
 Base URL local: `http://localhost:5080`.

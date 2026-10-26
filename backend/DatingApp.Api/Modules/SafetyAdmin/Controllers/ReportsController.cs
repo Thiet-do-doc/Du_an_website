@@ -7,24 +7,32 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using DatingApp.Api.Modules.ChatNotifications.Services;
 
 namespace DatingApp.Api.Modules.SafetyAdmin.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Policy = "User")]
 [Route("api/v1/reports")]
-public sealed class ReportsController(AppDbContext db, UserManager<ApplicationUser> users) : ControllerBase
+public sealed class ReportsController(AppDbContext db, UserManager<ApplicationUser> users, IChatReportTargetAccess chatAccess) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<ReportResponse>> Create(CreateReportRequest request, CancellationToken cancellationToken)
     {
         if (!Enum.IsDefined(request.TargetType)) return BadRequest(new { message = "Target type không hợp lệ." });
-        if (request.TargetType != ReportTargetType.User)
+        if (request.TargetType == ReportTargetType.Post)
             return StatusCode(StatusCodes.Status501NotImplemented,
                 new { message = "Module sở hữu tin nhắn/bài viết chưa cung cấp kiểm tra quyền đối tượng báo cáo." });
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (actorId is null) return Unauthorized();
         string? targetUserId = null;
+        if (request.TargetType == ReportTargetType.Message)
+        {
+            if (!Guid.TryParse(actorId, out var reporterId) || !Guid.TryParse(request.TargetId, out var messageId)
+                || !await chatAccess.CanReportMessageAsync(reporterId, messageId, cancellationToken)) return NotFound();
+            targetUserId = (await db.Messages.Where(x => x.Id == messageId).Select(x => x.SenderId)
+                .SingleAsync(cancellationToken)).ToString();
+        }
         if (request.TargetType == ReportTargetType.User)
         {
             targetUserId = request.TargetId.Trim();

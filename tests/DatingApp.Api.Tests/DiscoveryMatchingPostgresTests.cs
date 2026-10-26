@@ -105,6 +105,7 @@ public sealed class DiscoveryMatchingPostgresTests
         var noPhoto = ids[7];
         var interestId = Guid.Parse("10000000-0000-0000-0000-000000000001");
         var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        var testCity = "Discovery-" + Guid.NewGuid().ToString("N");
 
         await using (var setup = new AppDbContext(options))
         {
@@ -121,6 +122,8 @@ public sealed class DiscoveryMatchingPostgresTests
             await SeedProfile(setup, noPhoto, "No photo", active: true, discoverable: true, complete: true,
                 interestId: interestId, dateOfBirth: today.AddYears(-30), includePhoto: false);
             await setup.SaveChangesAsync();
+            await setup.Profiles.Where(x => ids.Contains(x.UserId) && x.UserId != wrongFilters)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.City, testCity));
         }
 
         try
@@ -128,10 +131,10 @@ public sealed class DiscoveryMatchingPostgresTests
             await using var db = new AppDbContext(options);
             var profiles = new ProfileService(db, TimeProvider.System);
             var service = new DiscoveryService(db, new DiscoveryProfileQueryAdapter(profiles), new FixedBlockLookup(blocked));
-            var result = await service.SearchAsync(viewer, new DatingApp.Api.Modules.DiscoveryMatching.DTOs.DiscoveryQuery(), default);
+            var result = await service.SearchAsync(viewer, new DatingApp.Api.Modules.DiscoveryMatching.DTOs.DiscoveryQuery(City: testCity), default);
             Assert.Equal(new[] { noPhoto, visible }, result.Items.Select(x => x.UserId));
             var filtered = await service.SearchAsync(viewer, new DatingApp.Api.Modules.DiscoveryMatching.DTOs.DiscoveryQuery(
-                MinAge: 30, MaxAge: 30, City: "Hà Nội", Interest: "Du lịch"), default);
+                MinAge: 30, MaxAge: 30, City: testCity, Interest: "Du lịch"), default);
             Assert.Equal(new[] { noPhoto, visible }, filtered.Items.Select(x => x.UserId));
             Assert.All(filtered.Items, item =>
             {
