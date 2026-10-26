@@ -12,6 +12,8 @@ button:focus-visible,input:focus-visible { outline: 3px solid #299ab5; outline-o
 .demo-strip button { border: 1px solid #497085; background: transparent; color: white; border-radius: 7px; padding: 7px 11px; }
 .demo-strip button.chosen { background: #fff; color: #153646; border-color: #fff; }
 .shell { max-width: 1280px; margin: 0 auto; padding: 22px 14px; }
+.chat-navigation { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.chat-navigation a { color: #256b80; font-size: 14px; text-decoration: none; font-weight: 600; }
 .app-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .eyebrow { margin: 0; font-size: 11px; color: #2e7990; letter-spacing: .14em; font-weight: 800; }
 h1 { margin: 4px 0 5px; font-size: clamp(23px, 3.1vw, 31px); }

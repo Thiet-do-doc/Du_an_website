@@ -30,5 +30,5 @@ function SignedInChat() {
 
 // Authenticated /chat route. The demo A/B/C selector is deliberately not routed through the real UI.
 export default function AuthenticatedChatPage() {
-  return <ProtectedRoute><SignedInChat /></ProtectedRoute>;
+  return <div className="tv4-demo"><ProtectedRoute><SignedInChat /></ProtectedRoute></div>;
 }
