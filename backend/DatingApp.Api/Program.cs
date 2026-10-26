@@ -21,7 +21,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Đăng ký controller, xử lý lỗi và tài liệu API.
 builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddScoped<IBlockPolicy, BlockPolicy>();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
 builder.Services.AddOpenApi();
@@ -34,14 +33,6 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AuthConnectionRegistry>();
 builder.Services.AddSignalR(options => options.AddFilter<AccountHubFilter>());
-builder.Services.AddScoped<ChatService>();
-builder.Services.AddScoped<NotificationService>();
-builder.Services.AddScoped<IChatReportTargetAccess, ChatReportTargetAccess>();
-builder.Services.AddScoped<MatchChatBridge>();
-builder.Services.AddScoped<IMatchConversationBridge, MatchChatBridge>();
-builder.Services.AddScoped<IChatMatchAccess, IntegratedChatMatchAccess>();
-builder.Services.AddScoped<IChatBlockPolicy, IntegratedChatBlockPolicy>();
-builder.Services.AddScoped<IChatPermissions, ChatPermissions>();
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -76,6 +67,17 @@ if (!string.IsNullOrWhiteSpace(connectionString))
         throw new InvalidOperationException("Production phải cấu hình Email:SmtpHost và thông tin SMTP bằng secret.");
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(connectionString));
+    // DB-backed modules must follow the same configuration boundary as AppDbContext.
+    // Health and anonymous authorization still work on a fresh checkout without secrets.
+    builder.Services.AddScoped<IBlockPolicy, BlockPolicy>();
+    builder.Services.AddScoped<ChatService>();
+    builder.Services.AddScoped<NotificationService>();
+    builder.Services.AddScoped<IChatReportTargetAccess, ChatReportTargetAccess>();
+    builder.Services.AddScoped<MatchChatBridge>();
+    builder.Services.AddScoped<IMatchConversationBridge, MatchChatBridge>();
+    builder.Services.AddScoped<IChatMatchAccess, IntegratedChatMatchAccess>();
+    builder.Services.AddScoped<IChatBlockPolicy, IntegratedChatBlockPolicy>();
+    builder.Services.AddScoped<IChatPermissions, ChatPermissions>();
     builder.Services.AddScoped<ProfileService>();
     builder.Services.AddScoped<PhotoService>();
     builder.Services.AddScoped<DatingApp.Api.Modules.Profiles.Services.IDiscoveryProfileQuery>(sp => sp.GetRequiredService<ProfileService>());
