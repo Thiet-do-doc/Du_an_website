@@ -52,6 +52,8 @@ public sealed partial class AuthFlowTests
         var conversationId = match.GetProperty("conversationId").GetGuid();
         var matchId = match.GetProperty("matchId").GetGuid();
         Assert.NotEqual(Guid.Empty, conversationId);
+        var conversations = await (await a.GetApi("conversations", at)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Bob", conversations.GetProperty("items")[0].GetProperty("partnerName").GetString());
         Guid messageId;
         using (var scope = app.Services.CreateScope())
         {

@@ -22,7 +22,8 @@ database và migration tạo bảng Chat trùng không được đưa vào schem
   Conversation.MatchId. Sửa retry khi PostgreSQL tự rollback tại COMMIT và sửa
   offset phân trang khi lấy thêm một hồ sơ để tính hasMore.
 - Chat dùng Match/Block thật, AuthProvider, JWT và AccountHubFilter chung; Hub
-  đóng khi access token hết hạn. Client mở đúng conversation từ danh sách match.
+  đóng khi access token hết hạn. Client mở đúng conversation từ danh sách match;
+  danh sách chat hiển thị tên hồ sơ công khai thay cho nhãn demo.
 - Report Message kiểm tra đối tượng bằng IChatReportTargetAccess, chỉ cho thành
   viên báo cáo tin của người kia; vẫn cho báo cáo lịch sử sau block/unmatch.
 - Admin khóa tài khoản qua IAccountAccess; audit, trạng thái và thu hồi refresh

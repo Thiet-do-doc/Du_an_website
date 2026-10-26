@@ -10,7 +10,8 @@ namespace DatingApp.Api.Modules.ChatNotifications.Services;
 public sealed record SendResult(MessageDto Message, bool IsNew, Guid PartnerId, NotificationDto? Notification);
 
 public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
-    IChatMatchAccess matches, NotificationService notifications)
+    IChatMatchAccess matches, NotificationService notifications,
+    DatingApp.Api.Modules.Profiles.Services.IDiscoveryProfileQuery profiles)
 {
     public async Task<ConversationPage> ListConversationsAsync(Guid userId, int page, int pageSize,
         CancellationToken ct = default)
@@ -25,6 +26,9 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
         var candidates = await db.Conversations.AsNoTracking()
             .Where(c => matchIds.Contains(c.MatchId) && (c.UserLowId == userId || c.UserHighId == userId))
             .OrderByDescending(c => c.CreatedAt).ThenByDescending(c => c.Id).ToListAsync(ct);
+        var partnerIds = candidates.Select(c => c.UserLowId == userId ? c.UserHighId : c.UserLowId).Distinct().ToArray();
+        var partnerNames = (await profiles.GetByIdsAsync(userId, partnerIds, ct))
+            .ToDictionary(p => p.UserId, p => p.DisplayName);
         var visible = new List<ConversationDto>();
         foreach (var c in candidates)
         {
@@ -33,9 +37,9 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
             var last = await db.Messages.AsNoTracking().Where(x => x.ConversationId == c.Id)
                 .OrderByDescending(x => x.SentAt).ThenByDescending(x => x.Id)
                 .Select(x => MessageDto.From(x)).FirstOrDefaultAsync(ct);
-            // TV2's ProfileSummary is not on main yet. Do not expose email as a display name.
+            // Only public profile names are exposed; hidden profiles retain a neutral label.
             visible.Add(new ConversationDto(c.Id, c.MatchId, access.PartnerId,
-                "Người dùng", c.CreatedAt, last, access.CanSend));
+                partnerNames.GetValueOrDefault(access.PartnerId, "Người dùng"), c.CreatedAt, last, access.CanSend));
         }
         var items = visible.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
         return new ConversationPage(items, page, pageSize, visible.Count > page * pageSize);
