@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { getDiscover, getMatches, likeProfile, passProfile, unmatch } from '../api/discovery';
 import type { DiscoveryFilters, DiscoveryProfile, MatchSummary } from '../types/discovery';
 
-type Props = { onBack: () => void };
+
 const initialFilters: DiscoveryFilters = { minAge: 18, maxAge: 35, city: 'Tất cả khu vực', interest: 'Tất cả sở thích' };
 
-export default function DiscoveryPage({ onBack }: Props) {
+export default function DiscoveryPage() {
   const [filters, setFilters] = useState(initialFilters);
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [matches, setMatches] = useState<MatchSummary[]>([]);
@@ -82,12 +82,12 @@ export default function DiscoveryPage({ onBack }: Props) {
   }
 
   return <div className="dating-shell">
-    <header className="dating-topbar"><button className="wordmark" onClick={onBack} aria-label="Về trang chính">dear<span>you</span><i>✳</i></button>
+    <header className="dating-topbar">
       <nav className="dating-nav" aria-label="Điều hướng chính">
         <button className={activeTab === 'discover' ? 'nav-item selected' : 'nav-item'} onClick={() => { setError(''); setActiveTab('discover'); }}>Khám phá</button>
         <button className={activeTab === 'matches' ? 'nav-item selected' : 'nav-item'} onClick={() => { setError(''); setActiveTab('matches'); }}>Kết nối <span className="nav-count">{matches.length}</span></button>
       </nav>
-      <span className="profile-chip">Tài khoản</span>
+
     </header>
 
     <main className="discovery-layout">
@@ -96,7 +96,7 @@ export default function DiscoveryPage({ onBack }: Props) {
         <button className={activeTab === 'discover' ? 'side-link active' : 'side-link'} onClick={() => setActiveTab('discover')}><span>✳</span> Khám phá</button>
         <button className={activeTab === 'matches' ? 'side-link active' : 'side-link'} onClick={() => setActiveTab('matches')}><span>♡</span> Lượt thích & kết nối <b>{matches.length}</b></button>
         <div className="sidebar-note"><span className="note-spark">✳</span><p>Một kết nối tốt bắt đầu bằng sự tò mò chân thành.</p></div>
-        <p className="sidebar-foot">Kết nối API · dữ liệu hồ sơ thật</p>
+        <p className="sidebar-foot">Mỗi lời chào là một khởi đầu.</p>
       </aside>
 
       {activeTab === 'discover' ? <section className="discover-main">
@@ -132,6 +132,6 @@ export default function DiscoveryPage({ onBack }: Props) {
 function MatchesView({ matches, error, onDiscover, onUnmatch }: { matches: MatchSummary[]; error: string; onDiscover: () => void; onUnmatch: (id: string) => void }) {
   return <section className="discover-main matches-main"><div className="discover-heading"><div><p className="sidebar-eyebrow">NHỮNG KẾT NỐI CỦA BẠN</p><h1>Chuyện hay <em>bắt đầu từ đây.</em></h1><p>Các bạn đã cùng gửi lời thích cho nhau.</p></div></div>
     {error && <p className="interaction-notice" role="alert">{error}</p>}
-    {matches.length ? <div className="matches-grid">{matches.map(match => <article className="match-card" key={match.id}><PhotoBackground className="match-photo" photoUrl={match.otherProfile.photoUrl} /><div className="match-copy"><span className="match-kicker">✳ CÓ DUYÊN GẶP GỠ</span><h2>{match.otherProfile.name}, {match.otherProfile.age}</h2><p>{match.otherProfile.city} · {new Date(match.matchedAt).toLocaleDateString('vi-VN')}</p><a className="btn btn-dark" href={`/chat?conversation=${encodeURIComponent(match.conversationId)}`}>Mở cuộc trò chuyện <span>↗</span></a><button onClick={() => onUnmatch(match.id)}>Bỏ ghép đôi</button></div></article>)}</div> : <div className="empty-state matches-empty"><span>♡</span><h2>{error ? 'Cần đăng nhập để xem kết nối.' : 'Kết nối của bạn sẽ ở đây.'}</h2><p>{error || 'Hãy khám phá và gửi lời thích nhé.'}</p><button onClick={onDiscover}>Khám phá hồ sơ</button></div>}
+    {matches.length ? <div className="matches-grid">{matches.map(match => <article className="match-card" key={match.id}><PhotoBackground className="match-photo" photoUrl={match.otherProfile.photoUrl} /><div className="match-copy"><span className="match-kicker">✳ CÓ DUYÊN GẶP GỠ</span><h2>{match.otherProfile.name}, {match.otherProfile.age}</h2><p>{match.otherProfile.city} · {new Date(match.matchedAt).toLocaleDateString('vi-VN')}</p><a className="btn btn-dark" href={`/chat?conversation=${encodeURIComponent(match.conversationId)}`}>Mở cuộc trò chuyện <span>↗</span></a><button onClick={() => onUnmatch(match.id)}>Bỏ ghép đôi</button></div></article>)}</div> : <div className="empty-state matches-empty"><span>♡</span><h2>{error ? 'Chưa tải được kết nối.' : 'Kết nối của bạn sẽ ở đây.'}</h2><p>{error || 'Hãy khám phá và gửi lời thích nhé.'}</p><button onClick={onDiscover}>Khám phá hồ sơ</button></div>}
   </section>;
 }

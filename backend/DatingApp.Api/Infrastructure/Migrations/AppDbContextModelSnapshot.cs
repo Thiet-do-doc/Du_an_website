@@ -318,6 +318,32 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.Post", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("CreatedAtUtc", "Id");
+
+                    b.ToTable("Posts", (string)null);
+                });
+
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Interest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -852,6 +878,17 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Navigation("FromUser");
 
                     b.Navigation("ToUser");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.Post", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
                 });
 
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Photo", b =>

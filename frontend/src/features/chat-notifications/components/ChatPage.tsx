@@ -291,7 +291,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   const unread = notifications.filter(x => !x.readAt).length;
 
   return (
-    <main className="shell"><nav className="chat-navigation"><a href="/discover">Khám phá</a><a href="/profile">Hồ sơ</a><a href="/safety">An toàn</a><a href="/account">Tài khoản</a></nav>
+    <main className="shell">
       <header className="app-header">
         <div><p className="eyebrow">KẾT NỐI CỦA BẠN</p>
           <h1>Trung tâm trò chuyện</h1><span>Đăng nhập: <b>{displayName}</b></span></div>

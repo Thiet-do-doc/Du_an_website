@@ -72,3 +72,7 @@ h2 { margin: 0; font-size: 15px; }
 @media (max-width: 580px) { .shell { padding: 15px 9px; } .layout { display: flex; flex-direction: column; border-radius: 11px; } .conversations { border-right: 0; border-bottom: 1px solid #dfe9ee; } .conversations .person { display: inline-flex; width: 175px; margin-right: 5px; vertical-align: top; } .chat-top { padding: 13px; } .messages { height: 400px; min-height: 370px; } .notifications { grid-column: auto; } .demo-strip { gap: 8px; } .demo-strip button { padding: 5px; } }
 
 }
+@scope (.tv4-demo) {
+:scope { color:#412c37; background:transparent; font-family:'Segoe UI',Arial,sans-serif; }
+.shell { padding:0; } .eyebrow { color:#9b516b; } .app-header h1 { color:#412c37; font-size:34px; } .layout { border-color:#efdee5; box-shadow:0 12px 30px #a45b7310; } .messages { background:linear-gradient(160deg,#fffcfd,#fff2f7); } .mine .bubble { background:#b33f69; } .bubble { background:#f5e8ee; } .avatar { background:linear-gradient(135deg,#e8a1bb,#b34d76); } .person.selected { background:#fff0f6; border-color:#ebc0d1; } .person:hover { background:#fff6f9; } .person,.chat-top h2 { color:#412c37; } .composer button { background:#b33f69; } .composer input { background:#fffafd; border-color:#ead5df; } .section-heading span { color:#a43e65; background:#fbe6ee; } .notice.unread { background:#fff3f8; border-color:#f1d2df; } .notice button { color:#a43e65; } .conversations,.notifications,.chat-top { border-color:#f0e0e8; }
+}
