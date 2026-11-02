@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { GiftArt } from '../../gifts/GiftArt';
 import { HubConnection, HubConnectionBuilder, HubConnectionState,
   HttpTransportType, LogLevel } from '@microsoft/signalr';
 import { getConversations, getMessages, getNotifications, markRead, reportMessage } from '../api/chatApi';
@@ -322,7 +323,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
             {busy && <p className="muted">Đang tải...</p>}
             {messages.length === 0 && !busy && <div className="empty centered">Chưa có tin nhắn.</div>}
             {messages.map(m => <div key={m.id} className={`bubble-row ${m.senderId === userId ? 'mine' : ''}`}>
-              <div className="bubble"><div className="bubble-text">{m.content}</div>
+              <div className="bubble">{m.giftCode && <><GiftArt code={m.giftCode}/><small>Quà tặng mylove</small></>}<div className="bubble-text">{m.content}</div>
                 <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
                 {m.senderId !== userId && <button type="button" className="report-message"
                   onClick={() => void report(m)}>Báo cáo</button>}

@@ -19,7 +19,7 @@ async function csrf(): Promise<string> {
 }
 export async function publicPost<T>(path: string, body: unknown = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (['login', 'refresh', 'logout'].includes(path)) headers['X-CSRF-TOKEN'] = await csrf();
+  if (['login', 'verify-email-code', 'refresh', 'logout'].includes(path)) headers['X-CSRF-TOKEN'] = await csrf();
   return parse<T>(await fetch(`/api/v1/auth/${path}`, { method: 'POST', credentials: 'same-origin',
     headers, body: JSON.stringify(body), cache: 'no-store', signal: AbortSignal.timeout(15000) }));
 }
@@ -30,6 +30,10 @@ async function withSessionLock<T>(action: () => Promise<T>): Promise<T> {
 export async function login(email: string, password: string): Promise<Session> {
   const session = await withSessionLock(() => publicPost<Session>('login', { email, password }));
   publish(session); return session;
+}
+export async function verifyEmailCode(email: string, code: string) {
+  const session = await withSessionLock(() => publicPost<Session>('verify-email-code', { email, code }));
+  publish(session);
 }
 export function refresh(): Promise<Session | null> {
   if (refreshTask) return refreshTask;

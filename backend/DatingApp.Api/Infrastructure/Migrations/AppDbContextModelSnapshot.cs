@@ -35,6 +35,15 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("ConfirmationCodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ConfirmationCodeFailures")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("ConfirmationCodeHash")
+                        .HasColumnType("bytea");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -195,6 +204,10 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
 
                     b.Property<Guid>("ConversationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("GiftCode")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
 
                     b.Property<Guid>("SenderId")
                         .HasColumnType("uuid");

@@ -3,10 +3,10 @@ using DatingApp.Api.Modules.ChatNotifications.Entities;
 namespace DatingApp.Api.Modules.ChatNotifications.DTOs;
 
 public sealed record MessageDto(Guid Id, Guid ConversationId, Guid SenderId, Guid ClientMessageId,
-    string Content, DateTimeOffset SentAt)
+    string Content, DateTimeOffset SentAt, string? GiftCode = null)
 {
     public static MessageDto From(ChatMessage m) =>
-        new(m.Id, m.ConversationId, m.SenderId, m.ClientMessageId, m.Content, m.SentAt);
+        new(m.Id, m.ConversationId, m.SenderId, m.ClientMessageId, m.Content, m.SentAt, m.GiftCode);
 }
 
 public sealed record ConversationDto(Guid Id, Guid MatchId, Guid PartnerId, string PartnerName,

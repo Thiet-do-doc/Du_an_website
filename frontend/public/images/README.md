@@ -1,4 +1,4 @@
 # Ảnh nhóm mylove
-Đặt ảnh kỷ niệm của nhóm tại `frontend/public/images/team.jpg`.
-Banner tự dùng ảnh này; khi chưa có ảnh, hiển thị các tấm thiệp chữ trang trí.
-Ảnh ngang, tối thiểu khoảng 1200 × 650 px sẽ phù hợp. Không cần sửa code.
+Đặt năm ảnh JPEG tại đây với tên `member-1.jpg` đến `member-5.jpg`. Các ảnh xuất hiện theo thứ tự từ trái sang phải. Dùng ảnh chân dung và đặt khuôn mặt gần giữa khung hình. Vị trí còn thiếu sẽ hiển thị một tấm thiệp.
+
+Nếu muốn dùng một ảnh chung của cả nhóm, đặt ảnh ngang tên `team.jpg` tại đây. Banner ưu tiên ảnh nhóm. Bản Docker demo đọc trực tiếp thư mục này. Nhấn Ctrl + F5 sau khi thay ảnh.

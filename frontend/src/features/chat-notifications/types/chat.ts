@@ -4,6 +4,7 @@ export type Message = {
   senderId: string;
   clientMessageId: string;
   content: string;
+  giftCode?: string | null;
   sentAt: string;
 };
 export type Conversation = {

@@ -6,6 +6,13 @@ import type { DiscoveryFilters, DiscoveryProfile, MatchSummary } from '../types/
 
 const initialFilters: DiscoveryFilters = { minAge: 18, maxAge: 35, city: 'Tất cả khu vực', interest: 'Tất cả sở thích' };
 
+function DotOrbit() {
+  return <svg className="dot-orbit" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">
+    {Array.from({ length: 10 }, (_, i) => <circle key={i} cx="24" cy="6" r={1.6 + i * .18}
+      transform={'rotate(' + i * 36 + ' 24 24)'} fill="currentColor" opacity={.2 + i * .085} />)}
+  </svg>;
+}
+
 export default function DiscoveryPage() {
   const [filters, setFilters] = useState(initialFilters);
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
@@ -110,7 +117,7 @@ export default function DiscoveryPage() {
         </div>
 
         {error && <p className="interaction-notice" role="alert">{error}</p>}
-        {loading && !profile ? <div className="empty-state"><h2>Đang tải hồ sơ…</h2></div> : profile ? <div className="profile-stage" aria-live="polite">
+        {loading && !profile ? <div className="empty-state" role="status"><DotOrbit /><h2>Đang tải hồ sơ…</h2></div> : profile ? <div className="profile-stage" aria-live="polite">
           <article className="person-card">
             <PhotoBackground className="person-photo" photoUrl={profile.photoUrl} role="img" aria-label={`Ảnh hồ sơ ${profile.name}`}>
               <div className="photo-topline"><span className="verified">✓ Hồ sơ phù hợp</span><button className="more-button" onClick={() => { location.href = `/safety?user=${profile.id}`; }} aria-label="Chặn hoặc báo cáo hồ sơ">···</button></div>
@@ -122,7 +129,7 @@ export default function DiscoveryPage() {
             <div className="card-actions"><button className="action-pass" disabled={acting} onClick={() => advance('pass')} aria-label="Bỏ qua hồ sơ">×</button><span>Chưa phải lúc</span><button className="action-like" disabled={acting} onClick={() => advance('like')} aria-label="Thích hồ sơ">♡</button><span>Gửi lời thích</span></div>
           </article>
           <div className="stage-aside"><div className="daily-prompt"><span>✳ GỢI Ý HÔM NAY</span><p>Hỏi về điều khiến họ quên mất thời gian.</p></div><div className="privacy-note"><span>♧</span><p>Thông tin của bạn chỉ hiển thị với người phù hợp. Bạn luôn có thể bỏ qua hoặc chặn.</p></div></div>
-        </div> : <div className="empty-state"><span>✳</span><h2>{error ? 'Chưa tải được hồ sơ.' : 'Bạn đã xem hết hồ sơ.'}</h2><p>{error ? 'Hãy hoàn thiện hồ sơ hoặc thử lại sau.' : 'Thử nới bộ lọc để gặp thêm người mới nhé.'}</p>{hasMore ? <button onClick={() => setPage(current => current + 1)}>Tải thêm hồ sơ</button> : <button onClick={() => { setFilters(initialFilters); setPage(1); setIndex(0); setProfiles([]); }}>Đặt lại bộ lọc</button>}</div>}
+        </div> : <div className="empty-state"><DotOrbit /><h2>{error ? 'Chưa tải được hồ sơ.' : 'Bạn đã xem hết hồ sơ.'}</h2><p>{error ? 'Hãy hoàn thiện hồ sơ hoặc thử lại sau.' : 'Thử nới bộ lọc để gặp thêm người mới nhé.'}</p>{hasMore ? <button onClick={() => setPage(current => current + 1)}>Tải thêm hồ sơ</button> : <button onClick={() => { setFilters({ ...initialFilters }); setPage(1); setIndex(0); setProfiles([]); }}>Đặt lại bộ lọc</button>}</div>}
         <p className="interaction-notice" aria-live="polite">{notice}</p>
       </section> : <MatchesView matches={matches} error={error} onDiscover={() => setActiveTab('discover')} onUnmatch={removeMatch} />}
     </main>

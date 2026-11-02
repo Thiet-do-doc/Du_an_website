@@ -21,7 +21,7 @@ public sealed class AuthController(AuthService auth, IAntiforgery antiforgery, I
     public async Task<IActionResult> Register(RegisterRequest request)
     {
         var (result, userId) = await auth.RegisterAsync(request);
-        return result.Succeeded ? Ok(new { message = "Đăng ký thành công. Hãy kiểm tra email để xác nhận.", userId }) : IdentityFailure(result);
+        return result.Succeeded ? Ok(new { message = "Hãy kiểm tra email để lấy mã xác nhận.", userId }) : IdentityFailure(result);
     }
     [HttpPost("login"), AllowAnonymous, EnableRateLimiting("auth"), ValidateAuthCsrf]
     public async Task<IActionResult> Login(LoginRequest request)
@@ -50,6 +50,14 @@ public sealed class AuthController(AuthService auth, IAntiforgery antiforgery, I
     {
         var result = await auth.ConfirmEmailAsync(request);
         return result.Succeeded ? Ok(new { message = "Email đã được xác nhận. Bạn có thể đăng nhập." }) : IdentityFailure(result);
+    }
+    [HttpPost("verify-email-code"), AllowAnonymous, EnableRateLimiting("auth"), ValidateAuthCsrf]
+    public async Task<IActionResult> VerifyEmailCode(VerifyEmailCodeRequest request)
+    {
+        var session = await auth.VerifyEmailCodeAsync(request);
+        return session is null
+            ? Problem(statusCode: 400, title: "Mã không đúng, đã hết hạn hoặc đã hết lượt thử. Bạn có thể yêu cầu mã mới.")
+            : SessionResponse(session);
     }
     [HttpPost("resend-confirmation"), AllowAnonymous, EnableRateLimiting("auth")]
     public async Task<IActionResult> Resend(EmailRequest request)

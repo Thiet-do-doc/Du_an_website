@@ -63,7 +63,20 @@ public sealed partial class AuthFlowTests
             var replay = await chat.SendMessageAsync(conversationId, alice.Id, "Hello from integrated modules", clientId);
             messageId = sent.Message.Id;
             Assert.Equal(messageId, replay.Message.Id); Assert.False(replay.IsNew);
+            var giftId = Guid.NewGuid();
+            var gift = await chat.SendGiftAsync(conversationId, alice.Id, "tulip", giftId);
+            Assert.True(gift.IsNew);
+            Assert.NotNull(gift.Notification);
+            Assert.Equal("tulip", gift.Message.GiftCode);
+            Assert.Equal(gift.Message.Id, (await chat.SendGiftAsync(conversationId, alice.Id, "tulip", giftId)).Message.Id);
+            Assert.Equal(409, (await Assert.ThrowsAsync<ChatDomainException>(() =>
+                chat.SendMessageAsync(conversationId, alice.Id, gift.Message.Content, giftId))).StatusCode);
+            Assert.Equal(400, (await Assert.ThrowsAsync<ChatDomainException>(() =>
+                chat.SendGiftAsync(conversationId, alice.Id, "unknown", Guid.NewGuid()))).StatusCode);
         }
+        var gifts = await (await b.GetApi($"conversations/{conversationId}/gifts", bt)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("tulip", Assert.Single(gifts.EnumerateArray()).GetProperty("giftCode").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetApi($"conversations/{conversationId}/gifts", ct)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await b.GetApi($"conversations/{conversationId}/messages", bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetApi($"conversations/{conversationId}/messages", ct)).StatusCode);
         var report = new { targetType = "Message", targetId = messageId, reason = "Test report", description = "Integration test only" };
@@ -78,6 +91,10 @@ public sealed partial class AuthFlowTests
         Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"profiles/{bob.Id}", at)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await a.GetApi(photoPath, at)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"conversations/{conversationId}/messages", at)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"conversations/{conversationId}/gifts", at)).StatusCode);
+        using (var scope = app.Services.CreateScope())
+            Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() => scope.ServiceProvider
+                .GetRequiredService<ChatService>().SendGiftAsync(conversationId, alice.Id, "bear", Guid.NewGuid()))).StatusCode);
         Assert.Empty((await (await a.GetApi("matches", at)).Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray());
         using (var scope = app.Services.CreateScope())
             Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() => scope.ServiceProvider

@@ -3,14 +3,13 @@ using System.Net.Mail;
 namespace DatingApp.Api.Modules.Auth.Services;
 public interface IAuthEmailSender
 {
-    Task SendAsync(string email, string subject, string link, CancellationToken cancellationToken = default);
+    Task SendAsync(string email, string subject, string body, CancellationToken cancellationToken = default);
 }
 public sealed class AuthEmailSender(IConfiguration configuration, IWebHostEnvironment environment) : IAuthEmailSender
 {
-    public async Task SendAsync(string email, string subject, string link, CancellationToken cancellationToken = default)
+    public async Task SendAsync(string email, string subject, string body, CancellationToken cancellationToken = default)
     {
-        using var message = new MailMessage(configuration["Email:From"] ?? "noreply@datingapp.local", email, subject,
-            "Mở liên kết sau để tiếp tục. Nếu không yêu cầu, hãy bỏ qua email này.\n\n" + link);
+        using var message = new MailMessage(configuration["Email:From"] ?? "noreply@datingapp.local", email, subject, body);
         using var client = new SmtpClient();
         if (environment.IsDevelopment() && configuration["Email:Delivery"] == "Pickup")
         {

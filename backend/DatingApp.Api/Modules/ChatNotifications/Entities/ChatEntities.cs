@@ -21,6 +21,7 @@ public sealed class ChatMessage
     public Guid SenderId { get; set; }
     public Guid ClientMessageId { get; set; }
     public string Content { get; set; } = string.Empty;
+    public string? GiftCode { get; set; }
     public DateTimeOffset SentAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
