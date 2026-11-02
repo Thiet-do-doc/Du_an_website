@@ -66,8 +66,9 @@ public sealed class MatchChatBridge(AppDbContext db, IChatMatchAccess matches,
         var conversationId = await db.Conversations.AsNoTracking()
             .Where(c => c.MatchId == matchId).Select(c => (Guid?)c.Id).SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("PublishMatchCreatedAsync phải chạy sau khi conversation đã commit.");
-var noticeLow = await notifications.EnsureMatchAsync(match.UserLowId, matchId, conversationId, cancellationToken);
-var noticeHigh = await notifications.EnsureMatchAsync(match.UserHighId, matchId, conversationId, cancellationToken);        await hub.Clients.Users(new[] { match.UserLowId.ToString(), match.UserHighId.ToString() })
+        var noticeLow = await notifications.EnsureMatchAsync(match.UserLowId, matchId, conversationId, cancellationToken);
+        var noticeHigh = await notifications.EnsureMatchAsync(match.UserHighId, matchId, conversationId, cancellationToken);
+        await hub.Clients.Users(new[] { match.UserLowId.ToString(), match.UserHighId.ToString() })
             .SendAsync("MatchCreated", new { matchId, conversationId }, cancellationToken);
         await notifications.PublishAsync(noticeLow, cancellationToken);
         await notifications.PublishAsync(noticeHigh, cancellationToken);
