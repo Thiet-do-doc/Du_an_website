@@ -136,6 +136,114 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.ChatNotifications.Entities.AppNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DedupeKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("RecipientId", "DedupeKey")
+                        .IsUnique();
+
+                    b.HasIndex("RecipientId", "ReadAt");
+
+                    b.HasIndex("RecipientId", "CreatedAt", "Id");
+
+                    b.ToTable("Notifications", (string)null);
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.ChatNotifications.Entities.ChatMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderId", "ClientMessageId")
+                        .IsUnique();
+
+                    b.HasIndex("ConversationId", "SentAt", "Id");
+
+                    b.ToTable("Messages", (string)null);
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.ChatNotifications.Entities.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserHighId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserLowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MatchId")
+                        .IsUnique();
+
+                    b.HasIndex("UserHighId", "CreatedAt");
+
+                    b.HasIndex("UserLowId", "CreatedAt");
+
+                    b.ToTable("Conversations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Conversations_UserOrder", "\"UserLowId\" < \"UserHighId\"");
+                        });
+                });
+
             modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.Match", b =>
                 {
                     b.Property<Guid>("Id")
@@ -208,6 +316,32 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_UserLikes_NoSelfLike", "\"FromUserId\" <> \"ToUserId\"");
                         });
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.Post", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("CreatedAtUtc", "Id");
+
+                    b.ToTable("Posts", (string)null);
                 });
 
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Interest", b =>
@@ -393,6 +527,110 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.ToTable("UserInterests");
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.ModerationAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ModerationActions");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock", b =>
+                {
+                    b.Property<Guid>("BlockerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocker_user_id");
+
+                    b.Property<Guid>("BlockedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocked_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("BlockerUserId", "BlockedUserId");
+
+                    b.HasIndex("BlockedUserId");
+
+                    b.ToTable("user_blocks", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_user_blocks_no_self_block", "blocker_user_id <> blocked_user_id");
+                        });
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.UserReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReporterUserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReviewNotes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReviewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReviewedByUserId")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("TargetType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetUserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Reports");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -534,6 +772,57 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.ChatNotifications.Entities.AppNotification", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.ChatNotifications.Entities.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.ChatNotifications.Entities.ChatMessage", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.ChatNotifications.Entities.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.ChatNotifications.Entities.Conversation", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.DiscoveryMatching.Entities.Match", null)
+                        .WithMany()
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserHighId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserLowId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DatingApp.Api.Modules.DiscoveryMatching.Entities.Match", b =>
                 {
                     b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "HighUser")
@@ -591,6 +880,17 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Navigation("ToUser");
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.Post", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+                });
+
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Photo", b =>
                 {
                     b.HasOne("DatingApp.Api.Modules.Profiles.Entities.Profile", "Profile")
@@ -630,6 +930,21 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Navigation("Interest");
 
                     b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.SafetyAdmin.Entities.UserBlock", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("BlockedUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("BlockerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

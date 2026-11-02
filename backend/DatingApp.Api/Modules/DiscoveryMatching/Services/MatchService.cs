@@ -17,6 +17,7 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
         for (var attempt = 0; ; attempt++)
         {
             await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+            var committed = false;
             try
             {
                 var existingMatch = await FindPairAsync(fromUserId, toUserId, cancellationToken);
@@ -24,6 +25,7 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
                 if (existingMatch is { UnmatchedAt: null })
                 {
                     await tx.CommitAsync(cancellationToken);
+                    committed = true;
                     var existingConversationId = await conversations.GetConversationIdsAsync([existingMatch.Id], cancellationToken);
                     return new(true, existingMatch.Id, existingConversationId[existingMatch.Id], existingMatch.MatchedAt);
                 }
@@ -57,14 +59,17 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
                     (x.FromUserId == fromUserId && x.ToUserId == toUserId) ||
                     (x.FromUserId == toUserId && x.ToUserId == fromUserId)).ExecuteDeleteAsync(cancellationToken);
                 await tx.CommitAsync(cancellationToken);
+                committed = true;
 
                 // Realtime notification is deliberately outside the transaction. GET /matches is recovery.
                 await conversations.PublishMatchCreatedAsync(match.Id, cancellationToken);
                 return new(true, match.Id, conversationId, match.MatchedAt);
             }
-            catch (Exception ex) when (IsRetryableConcurrencyFailure(ex) && attempt < 5)
+            catch (Exception ex) when (!committed && IsRetryableConcurrencyFailure(ex) && attempt < 5)
             {
-                await tx.RollbackAsync(cancellationToken);
+                // PostgreSQL can already have rolled back a serialization failure at COMMIT.
+                try { await tx.RollbackAsync(cancellationToken); }
+                catch (InvalidOperationException) { }
                 db.ChangeTracker.Clear();
                 // Spread a burst of identical requests so they do not all collide
                 // again on the same serializable snapshot.
@@ -129,7 +134,7 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
 
     private static bool IsRetryableConcurrencyFailure(Exception exception)
     {
-        for (var current = exception; current is not null; current = current.InnerException!)
+        for (Exception? current = exception; current is not null; current = current.InnerException)
         {
             if (current is PostgresException postgres && postgres.SqlState is
                 PostgresErrorCodes.SerializationFailure or
@@ -137,7 +142,6 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
                 PostgresErrorCodes.UniqueViolation)
                 return true;
         }
-
         return false;
     }
 

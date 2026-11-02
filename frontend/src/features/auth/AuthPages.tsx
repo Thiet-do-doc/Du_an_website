@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, authenticatedFetch, publicPost } from './api';
 import { ProtectedRoute, useAuth } from './AuthProvider';
-type Mode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'confirm-email' | 'resend-confirmation';
+export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'confirm-email' | 'resend-confirmation';
+type Mode = AuthMode;
 const titles: Record<Mode, string> = { login: 'Đăng nhập', register: 'Tạo tài khoản', 'forgot-password': 'Quên mật khẩu',
   'reset-password': 'Đặt lại mật khẩu', 'confirm-email': 'Xác nhận email', 'resend-confirmation': 'Gửi lại email xác nhận' };
 export function AuthPage({ mode }: { mode: Mode }) {
@@ -15,7 +16,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
     event.preventDefault(); setBusy(true); setMessage(''); setError(''); setFieldErrors({});
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     try {
-      if (mode === 'login') { await auth.login(String(values.email), String(values.password)); location.assign('/account'); }
+      if (mode === 'login') { await auth.login(String(values.email), String(values.password)); location.assign('/'); }
       else {
         const result = await publicPost<{ message: string }>(mode,
           mode === 'confirm-email' ? { userId: params.get('userId'), token: params.get('token') } :
@@ -33,7 +34,10 @@ export function AuthPage({ mode }: { mode: Mode }) {
     const matching = Object.entries(fieldErrors).filter(([key]) => key.toLowerCase().endsWith(name.toLowerCase()));
     return matching.flatMap(([, values]) => values).map((value, index) => <div className="text-danger small" key={index}>{value}</div>);
   }
-  return <section className="auth-panel"><h1>{titles[mode]}</h1><form onSubmit={submit}>
+  return <section className="auth-panel">
+    {['login', 'register'].includes(mode) && <nav className="auth-tabs" aria-label="Tài khoản"><a href="/login" aria-current={mode === 'login' ? 'page' : undefined}>Đăng nhập</a><a href="/register" aria-current={mode === 'register' ? 'page' : undefined}>Đăng ký</a></nav>}
+    <span className="auth-heart" aria-hidden="true">♡</span><h1>{mode === 'login' ? 'Rất vui khi gặp bạn!' : titles[mode]}</h1>
+    <p className="auth-intro">{mode === 'login' ? 'Đăng nhập để tiếp tục câu chuyện của bạn.' : mode === 'register' ? 'Chỉ vài thông tin nhỏ để bắt đầu kết nối.' : 'Một bước nhỏ để trở lại với những kết nối của bạn.'}</p><form onSubmit={submit}>
     {mode !== 'confirm-email' && <label>Email<input name="email" type="email" autoComplete="email" required maxLength={256}
       defaultValue={mode === 'reset-password' ? params.get('email') ?? '' : ''} />{errors('email')}</label>}
     {password && <label>Mật khẩu<input name="password" type="password" required minLength={mode === 'login' ? 1 : 10}
@@ -42,12 +46,13 @@ export function AuthPage({ mode }: { mode: Mode }) {
       autoComplete="new-password" />{errors('confirmPassword')}<small>Mật khẩu từ 10 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt.</small></label>}
     {mode === 'register' && <label>Ngày sinh<input name="dateOfBirth" type="date" required />{errors('dateOfBirth')}<small>Bạn phải đủ 18 tuổi.</small></label>}
     {mode === 'confirm-email' && <p>Bấm nút để xác nhận địa chỉ email của bạn.</p>}
-    <button className="btn btn-dark" disabled={busy}>{busy ? 'Đang xử lý…' : titles[mode]}</button>
-    {message && <p className="text-success mt-3" role="status">{message}</p>}
+    {mode === 'login' && <a className="forgot-link" href="/forgot-password">Quên mật khẩu?</a>}
+    <button className="btn btn-dark auth-submit" disabled={busy}>{busy ? 'Đang xử lý…' : titles[mode]} {!busy && <span aria-hidden="true">↗</span>}</button>
+    {message && <div className="auth-success" role="status"><p>{message}</p>{mode === 'register' && <p>Xác nhận email rồi quay lại đăng nhập để vào mylove.</p>}{['confirm-email', 'reset-password'].includes(mode) && <a href="/login">Đăng nhập ngay →</a>}</div>}
     {error && <div className="text-danger mt-3" role="alert"><p>{error}</p>
       {Object.entries(fieldErrors).map(([key, values]) => <p key={key}>{values.join(' ')}</p>)}</div>}
-  </form><nav className="auth-links"><a href="/login">Đăng nhập</a><a href="/register">Đăng ký</a>
-    <a href="/forgot-password">Quên mật khẩu</a><a href="/resend-confirmation">Gửi lại xác nhận</a></nav></section>;
+  </form><nav className="auth-links">{mode !== 'login' && <a href="/login">Về đăng nhập</a>}{mode === 'login' && <a href="/register">Chưa có tài khoản? Đăng ký</a>}
+    <a href="/resend-confirmation">Gửi lại email xác nhận</a></nav></section>;
 }
 function AccountContent() {
   const auth = useAuth();

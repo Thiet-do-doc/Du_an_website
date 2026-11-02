@@ -2,13 +2,14 @@ using DatingApp.Api.Infrastructure.Data;
 using DatingApp.Api.Modules.Auth.Entities;
 using DatingApp.Api.Modules.Profiles.Contracts;
 using DatingApp.Api.Modules.Profiles.Entities;
+using DatingApp.Api.Modules.DiscoveryMatching.DTOs;
 using Microsoft.EntityFrameworkCore;
 
 namespace DatingApp.Api.Modules.Profiles.Services;
 
 public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) : IDiscoveryProfileQuery
 {
-    public async Task<ProfileResponse?> GetMineAsync(Guid userId, CancellationToken ct)
+    public async Task<MyProfileResponse?> GetMineAsync(Guid userId, CancellationToken ct)
     {
         var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId && x.IsActive, ct);
         if (user is null) return null;
@@ -17,16 +18,19 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
         return await ToResponseAsync(user, profile, ct);
     }
 
-    public async Task<ProfileResponse?> GetPublicAsync(Guid userId, CancellationToken ct)
+    public async Task<PublicProfileResponse?> GetPublicAsync(Guid userId, CancellationToken ct)
     {
         var user = await db.Users.SingleOrDefaultAsync(x => x.Id == userId && x.IsActive && x.EmailConfirmed, ct);
         if (user is null) return null;
         var profile = await db.Profiles.Include(x => x.UserInterests).ThenInclude(x => x.Interest)
             .SingleOrDefaultAsync(x => x.UserId == userId && x.IsDiscoverable, ct);
-        return profile is null ? null : await ToResponseAsync(user, profile, ct);
+        if (profile is null) return null;
+        var ownView = await ToResponseAsync(user, profile, ct);
+        return new PublicProfileResponse(ownView.UserId, ownView.DisplayName, ownView.Age, ownView.Bio,
+            ownView.City, ownView.Gender, ownView.Photos, ownView.Interests);
     }
 
-    public async Task<ProfileResponse> UpdateAsync(Guid userId, UpdateProfileRequest request, CancellationToken ct)
+    public async Task<MyProfileResponse> UpdateAsync(Guid userId, UpdateProfileRequest request, CancellationToken ct)
     {
         if (request.InterestIds is null) throw new ProfileValidationException("Danh sách sở thích không hợp lệ.");
         var displayName = request.DisplayName?.Trim();
@@ -55,8 +59,16 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
         profile.Gender = NullIfBlank(request.Gender);
         profile.IsDiscoverable = request.IsDiscoverable;
         profile.UpdatedAtUtc = timeProvider.GetUtcNow();
-        db.UserInterests.RemoveRange(profile.UserInterests);
-        foreach (var id in ids) profile.UserInterests.Add(new UserInterest { UserId = userId, InterestId = id });
+        var existingInterests = profile.UserInterests.ToDictionary(x => x.InterestId);
+        var removedInterests = existingInterests.Values.Where(x => !ids.Contains(x.InterestId)).ToArray();
+        foreach (var removed in removedInterests)
+        {
+            profile.UserInterests.Remove(removed);
+            db.UserInterests.Remove(removed);
+        }
+        foreach (var id in ids)
+            if (!existingInterests.ContainsKey(id))
+                profile.UserInterests.Add(new UserInterest { UserId = userId, InterestId = id });
         await db.SaveChangesAsync(ct);
         return (await GetMineAsync(userId, ct))!;
     }
@@ -70,10 +82,11 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
         var profile = await db.Profiles.Include(x => x.UserInterests).ThenInclude(x => x.Interest)
             .SingleOrDefaultAsync(x => x.UserId == userId && x.IsDiscoverable, cancellationToken);
         if (user is null || profile is null) return null;
+        if (!IsComplete(user, profile)) return null;
         var avatarUrl = await db.Photos.Where(x => x.UserId == userId && x.IsAvatar)
             .Select(x => (string?)$"/api/v1/photos/{x.Id}/content").SingleOrDefaultAsync(cancellationToken);
-        return new ProfileSummary(userId, profile.DisplayName, Age(user.DateOfBirth), profile.Bio, profile.City,
-            profile.UserInterests.Select(x => x.Interest.Name).ToArray(), avatarUrl);
+        return new ProfileSummary(userId, profile.DisplayName, Age(user.DateOfBirth), profile.City ?? "",
+            null, profile.Bio, profile.UserInterests.Select(x => x.Interest.Name).ToArray(), avatarUrl, null);
     }
 
     public async Task<bool> IsCompleteAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -106,7 +119,7 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
         if (interestFilter is not null)
             query = query.Where(x => x.UserInterests.Any(i => EF.Functions.ILike(i.Interest.Name, interestFilter)));
 
-        var skip = checked((criteria.Page - 1) * criteria.PageSize);
+        var skip = criteria.Offset ?? checked((criteria.Page - 1) * criteria.PageSize);
         var profiles = await query.OrderBy(x => x.DisplayName).ThenBy(x => x.UserId)
             .Skip(skip).Take(criteria.PageSize)
             .Select(x => new ProfileSummaryRow(x.UserId, x.DisplayName, x.Bio, x.City, x.User.DateOfBirth))
@@ -127,13 +140,13 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
         return await ToSummariesAsync(profiles, cancellationToken);
     }
 
-    private async Task<ProfileResponse> ToResponseAsync(ApplicationUser user, Profile? profile, CancellationToken ct)
+    private async Task<MyProfileResponse> ToResponseAsync(ApplicationUser user, Profile? profile, CancellationToken ct)
     {
         var photos = profile is null ? [] : await db.Photos.Where(x => x.UserId == user.Id).OrderBy(x => x.SortOrder)
             .Select(x => new PhotoResponse(x.Id, $"/api/v1/photos/{x.Id}/content", x.IsAvatar, x.SortOrder)).ToArrayAsync(ct);
         var interests = profile?.UserInterests.OrderBy(x => x.Interest.Name)
             .Select(x => new InterestResponse(x.InterestId, x.Interest.Name)).ToArray() ?? [];
-        return new ProfileResponse(user.Id, profile?.DisplayName ?? "", Age(user.DateOfBirth), profile?.Bio,
+        return new MyProfileResponse(user.Id, profile?.DisplayName ?? "", Age(user.DateOfBirth), profile?.Bio,
             profile?.City, profile?.Gender, profile?.IsDiscoverable ?? false,
             profile is not null && IsComplete(user, profile), photos, interests);
     }
@@ -169,8 +182,8 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
         var namesByUser = interests.GroupBy(x => x.UserId).ToDictionary(x => x.Key,
             x => (IReadOnlyCollection<string>)x.Select(v => v.Name).ToArray());
         return profileRows.Select(x => new ProfileSummary(x.UserId, x.DisplayName,
-            Age(x.DateOfBirth), x.Bio, x.City,
-            namesByUser.GetValueOrDefault(x.UserId, Array.Empty<string>()), avatars.GetValueOrDefault(x.UserId)))
+            Age(x.DateOfBirth), x.City ?? "", null, x.Bio,
+            namesByUser.GetValueOrDefault(x.UserId, Array.Empty<string>()).ToArray(), avatars.GetValueOrDefault(x.UserId), null))
             .ToArray();
     }
 

@@ -12,6 +12,18 @@ async function api() {
 }
 const session = { token: 'access-in-memory', expiresAt: new Date(Date.now() + 600000).toISOString(), user: { id: 'user-id', email: 'test@example.com' } };
 const response = (body, status = 200) => new Response(status === 204 ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+test('protected photos use bearer auth and do not turn permission errors into blobs', async () => {
+  const auth = await api(); auth.publish(session);
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.headers.get('Authorization'), 'Bearer access-in-memory');
+    return new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': 'image/png' } });
+  };
+  const blob = await auth.authenticatedFetch('/api/v1/photos/test/content', {}, r => r.blob());
+  assert.equal(blob.type, 'image/png'); assert.equal(blob.size, 3);
+  globalThis.fetch = async () => response({ title: 'Unavailable' }, 404);
+  await assert.rejects(auth.authenticatedFetch('/api/v1/photos/test/content', {}, r => r.blob()), error => error.status === 404);
+});
 test('parallel restores share one refresh and include CSRF credentials', async () => {
   const auth = await api(); const calls = [];
   globalThis.fetch = async (url, options) => { calls.push({ url, options }); return response(url.endsWith('/csrf') ? { token: 'csrf-token' } : session); };

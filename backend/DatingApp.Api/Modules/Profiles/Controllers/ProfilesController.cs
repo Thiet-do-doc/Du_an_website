@@ -5,18 +5,20 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ImageMagick;
+using DatingApp.Api.Modules.SafetyAdmin.Services;
 
 namespace DatingApp.Api.Modules.Profiles.Controllers;
 
 [ApiController, Route("api/v1")]
-public sealed class ProfilesController(ProfileService profiles, PhotoService photos, ICurrentUser currentUser) : ControllerBase
+public sealed class ProfilesController(ProfileService profiles, PhotoService photos, ICurrentUser currentUser, IBlockPolicy blocks) : ControllerBase
 {
     [Authorize(Policy = "User"), HttpGet("profiles/me")]
     public async Task<IActionResult> Mine(CancellationToken ct) => Ok(await profiles.GetMineAsync(currentUser.UserId!.Value, ct));
 
-    [AllowAnonymous, HttpGet("profiles/{id:guid}")]
+    [Authorize(Policy = "User"), HttpGet("profiles/{id:guid}")]
     public async Task<IActionResult> Public(Guid id, CancellationToken ct)
     {
+        if (!await blocks.CanInteractAsync(currentUser.UserId!.Value, id, ct)) return NotFound();
         var profile = await profiles.GetPublicAsync(id, ct);
         return profile is null ? NotFound() : Ok(profile);
     }
@@ -60,10 +62,11 @@ public sealed class ProfilesController(ProfileService profiles, PhotoService pho
     public async Task<IActionResult> DeletePhoto(Guid id, CancellationToken ct) =>
         await photos.DeleteAsync(currentUser.UserId!.Value, id, ct) ? NoContent() : NotFound();
 
-    [AllowAnonymous, HttpGet("photos/{id:guid}/content")]
+    [Authorize(Policy = "User"), HttpGet("photos/{id:guid}/content")]
     public async Task<IActionResult> PhotoContent(Guid id, CancellationToken ct)
     {
-        var photo = await photos.GetContentAsync(id, ct);
-        return photo is null ? NotFound() : File(photo.Content, photo.ContentType);
+        var photo = await photos.GetContentAsync(id, currentUser.UserId!.Value, ct);
+        if (photo is null || !await blocks.CanInteractAsync(currentUser.UserId.Value, photo.UserId, ct)) return NotFound();
+        return File(photo.Content, photo.ContentType);
     }
 }

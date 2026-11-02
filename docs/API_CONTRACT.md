@@ -1,3 +1,5 @@
+> Cập nhật 26/10/2026: các module đã được nối trong bản tích hợp. Xem [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md) cho schema và hành vi hiện hành. Nội dung bàn giao bên dưới được giữ để đối chiếu lịch sử.
+
 # Hợp đồng API hiện có
 
 Base URL local: `http://localhost:5080`.
@@ -16,6 +18,10 @@ Thời gian trên là ví dụ; server trả thời gian hiện tại khi chạy
 
 Chưa có Swagger UI. Có thể import URL OpenAPI vào Postman hoặc mở các GET trực tiếp.
 API Auth thật đã có: xem [Auth API và Postman](AUTH_TESTING.md).
+Profiles có API xem/sửa hồ sơ cá nhân, hồ sơ công khai, danh mục sở thích và
+upload/đặt/xóa/sắp xếp ảnh; hợp đồng chi tiết nằm trong
+[`Modules/Profiles/README.md`](../backend/DatingApp.Api/Modules/Profiles/README.md).
+
 Profile API có trong `Modules/Profiles`; Discovery/Matching được mô tả dưới đây. Block lookup và conversation bridge vẫn trả 503 cho tới khi module chủ quản đăng ký adapter.
 
 ## Discovery và Matching
@@ -37,3 +43,9 @@ Quy ước tạo kết nối cho TV4: mỗi Match đang hoạt động có đún
 Quy ước: camelCase cho JSON, UTC cho thời gian, UUID cho định danh; DTO không trả
 password hash, token bí mật hoặc ngày sinh của người khác. API nghiệp vụ sẽ dùng
 Problem Details cho lỗi; health readiness là ngoại lệ có body health riêng.
+
+
+## Tuần 2 — Block (#21)
+
+GET/POST/DELETE `/api/v1/blocks`: JWT + CurrentUser Guid theo hợp đồng chung.
+Chi tiết DTO, status, quy tắc hai chiều và ví dụ ghép module: [ISSUE_21_HANDOFF.md](ISSUE_21_HANDOFF.md).

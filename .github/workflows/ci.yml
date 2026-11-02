@@ -58,4 +58,7 @@ jobs:
           ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=5432;Database=datingapp_test;Username=postgres;Password=ci_test_password
           Jwt__Key: ci-only-test-signing-key-at-least-32-bytes
           Auth__FrontendUrl: https://frontend.test
+      - run: dotnet ef migrations has-pending-model-changes --project backend/DatingApp.Api --configuration Release --no-build
+        env:
+          ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=5432;Database=datingapp_test;Username=postgres;Password=ci_test_password
       - run: dotnet test DatingApp.slnx --no-build --configuration Release

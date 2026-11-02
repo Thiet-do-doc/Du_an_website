@@ -1,16 +1,5 @@
 namespace DatingApp.Api.Modules.DiscoveryMatching.DTOs;
 
-// Boundary DTO owned by DiscoveryMatching. Profiles supplies this projection; DOB is never exposed.
-public sealed record ProfileSummary(
-    Guid UserId,
-    string DisplayName,
-    int Age,
-    string City,
-    string? Occupation,
-    string? Bio,
-    IReadOnlyList<string> Interests,
-    string? PhotoUrl,
-    int? DistanceKm);
 
 public sealed record DiscoveryQuery(
     int Page = 1,

@@ -1,18 +1,12 @@
-# SafetyAdmin
-- Chủ trì: **TV5**. Dự phòng: **TV1**.
-- Phạm vi: Block, report, quản trị, khóa tài khoản và audit.
-- Bảng dự kiến: Blocks, Reports, ModerationActions.
-- Frontend tương ứng: `frontend/src/features/safety-admin/`.
+# SafetyAdmin — Khuyến (#21)
 
-Đây là chỗ phát triển tiếp, chưa có endpoint nghiệp vụ.
+Dùng Identity Guid, JWT và ICurrentUser từ nhánh chung. API chặn: GET danh sách,
+POST /api/v1/blocks/{targetUserId}, DELETE cùng đường dẫn. Lặp lại an toàn;
+IBlockPolicy kiểm tra hai chiều. UI thật tại /blocks, dùng authenticatedFetch.
 
-## Đầu việc đầu tiên
-1. Chốt request/response DTO và quy tắc quyền với thành viên liên quan.
-2. Tạo entity, cấu hình EF Core và migration có review khi đã chốt schema.
-3. Xây service xử lý nghiệp vụ; controller chỉ nhận, kiểm tra và trả HTTP.
-4. Nối giao diện React với API thật, có loading/error/empty.
-5. Thêm kiểm thử sai quyền và quy tắc quan trọng; gửi PR cho người khác review.
+Xem [bàn giao #21](../../../../docs/ISSUE_21_HANDOFF.md) cho DTO, test, migration,
+quy tắc ẩn hội thoại và ví dụ discovery/chat. Xem [vận hành](../../../../infra/OPERATIONS.md).
+Chưa xác nhận chặn xuyên hệ thống cho tới khi người phụ trách ghép policy vào module.
 
-Không tạo bảng hoặc API trùng với module khác. Không phát triển trước Auth
-bằng cách cho phép mọi người thao tác dữ liệu. Trao đổi API qua `Shared/Contracts`
-và service nếu cần thay đổi dữ liệu thuộc module khác.
+Report/Admin hiện có được giữ lại, ngoài phạm vi nghiệm thu tuần 2. Report Message/Post
+vẫn trả 501 cho tới khi có kiểm tra quyền từ module sở hữu. API Admin yêu cầu role Admin.

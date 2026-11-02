@@ -1,4 +1,5 @@
 using DatingApp.Api.Modules.Profiles.Contracts;
+using DatingApp.Api.Modules.DiscoveryMatching.DTOs;
 
 namespace DatingApp.Api.Modules.Profiles.Services;
 

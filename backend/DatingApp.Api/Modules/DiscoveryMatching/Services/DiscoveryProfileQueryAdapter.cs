@@ -14,7 +14,9 @@ public sealed class DiscoveryProfileQueryAdapter(
     public async Task<IReadOnlyList<DiscoveryProfileSummary>> SearchAsync(Guid viewerId, DiscoveryQuery query,
         IReadOnlySet<Guid> excludedUserIds, CancellationToken cancellationToken)
     {
-        var criteria = new ProfileSearchCriteria(query.Page, query.PageSize, query.MinAge, query.MaxAge, query.City, query.Interest);
+        // Discovery requests one lookahead item; it must not increase the offset between pages.
+        var criteria = new ProfileSearchCriteria(query.Page, query.PageSize, query.MinAge, query.MaxAge, query.City, query.Interest,
+            checked((query.Page - 1) * (query.PageSize - 1)));
         var items = await profiles.SearchAsync(viewerId, criteria, excludedUserIds, cancellationToken);
         return items.Select(Map).ToArray();
     }
@@ -26,7 +28,5 @@ public sealed class DiscoveryProfileQueryAdapter(
         return items.Select(Map).ToArray();
     }
 
-    private static DiscoveryProfileSummary Map(DatingApp.Api.Modules.Profiles.Contracts.ProfileSummary profile) =>
-        new(profile.UserId, profile.DisplayName, profile.Age, profile.City ?? "", null, profile.Bio,
-            profile.Interests.ToArray(), profile.AvatarUrl, null);
+    private static DiscoveryProfileSummary Map(DiscoveryProfileSummary profile) => profile;
 }

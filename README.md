@@ -9,6 +9,8 @@ token. Thành viên chuyển code từ các nhánh cũ theo
 Chỉ chạy project trong `backend/DatingApp.Api` và `frontend`; các bản Auth/project
 trùng ở gốc từ PR #2 đã được thay bằng Auth trong module, lịch sử Git vẫn giữ nguyên.
 
+> Bản tích hợp hiện hành: [hướng dẫn chạy, migration và phạm vi kiểm chứng](docs/INTEGRATION_STATUS.md).
+
 ## Có sẵn và chưa có
 
 **Có sẵn:** trang kiểm tra kết nối frontend/API/database; AppDbContext; cấu hình
@@ -20,8 +22,9 @@ refresh/logout, forgot/reset-password, giao diện React và kiểm thử.
 Xem [hướng dẫn Auth](docs/AUTH_TESTING.md) để chạy migration, lấy email local
 và import Postman collection.
 
-**Chưa có:** upload, match, chat SignalR nghiệp vụ, admin/report và deploy production.
-Auth đã cung cấp policy và hợp đồng kiểm tra tài khoản cho các module đó.
+**TV4 đã được tích hợp ở mức source:** ChatHub, REST API hội thoại/lịch sử, thông báo, giao diện có xác thực tại `/chat`, chống gửi trùng và script kiểm thử. Phần nghiệp vụ Chat chưa được nghiệm thu toàn luồng: branch ZIP này chưa chứa Match model/service thật của TV3 hoặc BlockPolicy Guid của TV5 nên các API chat cố ý fail-closed cho đến khi adapter được tích hợp và migration được review. Không coi bản này là website hoàn chỉnh.
+
+**Còn thiếu:** Profiles/upload, Matching thật, Block/report/admin thật và deploy production. Auth đã cung cấp policy và hợp đồng kiểm tra tài khoản cho các module đó.
 
 ## 1. Cài công cụ
 
@@ -38,7 +41,7 @@ phiên bản bằng PR chung sau khi kiểm tra tương thích, không nâng ri�
 ## 2. Chạy nhanh frontend và API trước khi có database
 
 Mở thư mục gốc chứa `DatingApp.slnx`, `frontend` và `backend` bằng VS Code.
-Mọi lệnh sau chạy từ gốc project trừ khi có lệnh `cd`.
+Mọi lệnh sau chạy từ gốc project trừ khi có lệnh `cd`. Sau khi đăng nhập tài khoản Auth, route Chat TV4 đã tích hợp là `http://localhost:5173/chat`; route này cần database migration và adapter Match/Block thật trước khi nghiệp vụ chạy được.
 
 **Terminal 1 — API**
 ```powershell
@@ -133,9 +136,9 @@ test riêng. Xem docs/AUTH_TESTING.md để chạy các luồng tài khoản.
 
 ## 6. Công việc tiếp theo
 
-Auth đã có trong nền chung. TV2 bổ sung Profiles/media; TV3, TV4 và TV5 cập nhật
-module theo UUID, JWT và service tài khoản hiện tại. Các phần này cần PR và kiểm
-thử riêng trước khi có thể chạy toàn luồng. Xem hướng dẫn tích hợp ở trên.
+Các module đã được nối trong bản tích hợp. TV2, TV3, TV4 và TV5 tiếp tục kiểm tra
+module theo UUID, JWT và service tài khoản hiện tại. Các thay đổi tiếp theo cần PR và kiểm
+thử hồi quy. Xem docs/INTEGRATION_STATUS.md cho schema và các bước chạy hiện hành.
 
 Local EF tool đã khai báo trong `.config/dotnet-tools.json`:
 ```powershell
@@ -161,3 +164,10 @@ nội dung bộ khung vào repo đó, giữ `.git`, tạo nhánh và gửi PR. K
 - https://learn.microsoft.com/aspnet/core/fundamentals/openapi/overview?view=aspnetcore-10.0
 - https://www.npgsql.org/efcore/
 - https://learn.microsoft.com/dotnet/core/tools/global-json
+
+
+## Khuyến — issue #21
+
+UI chặn thật: `/blocks` sau khi đăng nhập. Xem [bàn giao #21](docs/ISSUE_21_HANDOFF.md)
+và [khung vận hành](infra/OPERATIONS.md). Dùng migration chung mới nhất, không áp migration
+SafetyAdmin cũ tạo Identity string. Chat/discovery cần ghép IBlockPolicy trước khi xác nhận chặn toàn hệ thống.

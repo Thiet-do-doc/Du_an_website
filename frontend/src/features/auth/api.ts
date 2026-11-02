@@ -44,7 +44,7 @@ export async function logout() {
   publish(null);
   const channel = new BroadcastChannel('datingapp-auth'); channel.postMessage('logout'); channel.close();
 }
-export async function authenticatedFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function authenticatedFetch<T>(path: string, init: RequestInit = {}, readBody: (response: Response) => Promise<T> = parse<T>): Promise<T> {
   async function send() {
     const headers = new Headers(init.headers);
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
@@ -53,5 +53,6 @@ export async function authenticatedFetch<T>(path: string, init: RequestInit = {}
   let response = await send();
   if (response.status === 401 && await refresh()) response = await send();
   if (response.status === 401) publish(null);
-  return parse<T>(response);
+  if (!response.ok) return parse<T>(response);
+  return readBody(response);
 }
