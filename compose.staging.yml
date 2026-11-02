@@ -23,6 +23,7 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ReverseProxy__TrustedNetwork: ${TRUSTED_PROXY_CIDR:-}
       Jwt__Key: ${JWT_KEY:?Set JWT_KEY (at least 32 bytes)}
       Jwt__Issuer: DatingApp.Api
       Jwt__Audience: DatingApp.Client

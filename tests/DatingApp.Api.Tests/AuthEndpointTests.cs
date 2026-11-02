@@ -18,6 +18,36 @@ public sealed class AuthEndpointTests
     private const string TestKey = "test-only-signing-key-at-least-32-bytes-long";
 
     [Theory]
+    [InlineData("192.0.2.12", 200)]
+    [InlineData("198.51.100.12", 500)]
+    public async Task CsrfHonorsHttpsOnlyFromTrustedProxy(string proxyAddress, int expectedStatus)
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+            builder.UseEnvironment("Testing")
+                .UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=unused;Username=unused")
+                .UseSetting("Auth:FrontendUrl", "https://frontend.test")
+                .UseSetting("Jwt:Key", TestKey)
+                .UseSetting("ReverseProxy:TrustedNetwork", "192.0.2.0/24"));
+        var result = await factory.Server.SendAsync(context =>
+        {
+            context.Connection.RemoteIpAddress = IPAddress.Parse(proxyAddress);
+            context.Request.Method = "GET";
+            context.Request.Scheme = "http";
+            context.Request.Path = "/api/v1/auth/csrf";
+            context.Request.Headers["X-Forwarded-Proto"] = "https";
+        });
+
+        Assert.Equal(expectedStatus, result.Response.StatusCode);
+        var cookie = result.Response.Headers.SetCookie.ToString();
+        if (expectedStatus == 200)
+        {
+            Assert.Contains("datingapp.csrf=", cookie);
+            Assert.Contains("; secure", cookie, StringComparison.OrdinalIgnoreCase);
+        }
+        else Assert.DoesNotContain("datingapp.csrf=", cookie);
+    }
+
+    [Theory]
     [InlineData("valid", HttpStatusCode.OK)]
     [InlineData("missing", HttpStatusCode.Unauthorized)]
     [InlineData("expired", HttpStatusCode.Unauthorized)]

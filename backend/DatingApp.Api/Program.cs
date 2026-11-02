@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using DatingApp.Api.Modules.Profiles.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -178,6 +179,16 @@ if (builder.Configuration["grant-admin"] is string adminEmail)
     if (!result.Succeeded && !await users.IsInRoleAsync(user, "Admin"))
         throw new InvalidOperationException("Không cấp được vai trò Admin.");
     return;
+}
+
+// Only the private proxy network may identify the original HTTPS scheme.
+if (builder.Configuration["ReverseProxy:TrustedNetwork"] is { Length: > 0 } proxyCidr)
+{
+    var network = System.Net.IPNetwork.Parse(proxyCidr);
+    if (network.PrefixLength == 0) throw new InvalidOperationException("ReverseProxy:TrustedNetwork must be a scoped network.");
+    var forwarding = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedProto };
+    forwarding.KnownIPNetworks.Add(network);
+    app.UseForwardedHeaders(forwarding);
 }
 
 // Xử lý lỗi HTTP.

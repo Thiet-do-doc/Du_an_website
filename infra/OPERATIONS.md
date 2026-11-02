@@ -12,6 +12,7 @@ Copy `.env.example` sang `.env` (đã ignore), tự điền secret. Compose đ�
 | JWT_KEY | Jwt__Key, secret ngẫu nhiên ít nhất 32 byte |
 | — | Jwt__Issuer=DatingApp.Api; Jwt__Audience=DatingApp.Client; Jwt__ExpireMinutes=10 |
 | AUTH_FRONTEND_URL | Auth__FrontendUrl, URL HTTPS công khai, dùng link email |
+| TRUSTED_PROXY_CIDR | Subnet riêng của mạng Docker chứa Nginx. Khi HTTPS kết thúc ở proxy ngoài, đặt giá trị này để API nhận đúng giao thức và cấp cookie CSRF Secure. |
 | EMAIL_FROM | Email__From |
 | SMTP_HOST, SMTP_PORT | Email__SmtpHost, Email__SmtpPort (587 mặc định, TLS) |
 | SMTP_USERNAME, SMTP_PASSWORD | Email__Username, Email__Password |
@@ -38,6 +39,7 @@ Backup/restore phải được thử trên DB riêng trước khi dùng môi tr�
 - Khung `infra/nginx.conf` phục vụ SPA, proxy /api và nâng cấp WebSocket /hubs.
 - Giữ Authorization header, không cache response auth; không ghi token query vào access log Hub.
 - Đặt HTTPS/TLS ở reverse proxy ngoài, certificate và chuyển HTTP sang HTTPS.
+- Proxy ngoài phải ghi đè `X-Forwarded-Proto`. Chỉ cho proxy ngoài và các dịch vụ tin cậy truy cập Nginx. Lấy subnet qua `docker network inspect mylove_internal --format '{{(index .IPAM.Config 0).Subnet}}'` (thay tên mạng theo project) và đặt `TRUSTED_PROXY_CIDR` trong `.env`. Sau khi triển khai, kiểm tra `GET /api/v1/auth/csrf` qua HTTPS trả 200 và đặt cookie Secure.
 - Cookie refresh/CSRF production có Secure: browser phải truy cập HTTPS để đăng nhập.
 - Truyền Host và X-Forwarded-Proto chính xác; chỉ tin proxy đã khai báo, không bật tin mọi IP.
 - Chọn domain cùng origin cho UI/API để dùng cookie/CSRF; không mở CORS wildcard credentials.
