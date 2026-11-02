@@ -25,7 +25,6 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
                 {
                     await tx.CommitAsync(cancellationToken);
                     var existingConversationId = await conversations.GetConversationIdsAsync([existingMatch.Id], cancellationToken);
-                    await conversations.PublishMatchCreatedAsync(existingMatch.Id, cancellationToken);
                     return new(true, existingMatch.Id, existingConversationId[existingMatch.Id], existingMatch.MatchedAt);
                 }
 
@@ -63,10 +62,13 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
                 await conversations.PublishMatchCreatedAsync(match.Id, cancellationToken);
                 return new(true, match.Id, conversationId, match.MatchedAt);
             }
-            catch (Exception ex) when (IsRetryableConcurrencyFailure(ex) && attempt < 2)
+            catch (Exception ex) when (IsRetryableConcurrencyFailure(ex) && attempt < 5)
             {
                 await tx.RollbackAsync(cancellationToken);
                 db.ChangeTracker.Clear();
+                // Spread a burst of identical requests so they do not all collide
+                // again on the same serializable snapshot.
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 25) * (attempt + 1)), cancellationToken);
             }
         }
     }
@@ -125,9 +127,19 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
     private Task<Match?> FindPairAsync(Guid a, Guid b, CancellationToken ct) =>
         db.Matches.SingleOrDefaultAsync(x => x.UserLowId == Min(a, b) && x.UserHighId == Max(a, b), ct);
 
-    private static bool IsRetryableConcurrencyFailure(Exception exception) =>
-        exception is DbUpdateException ||
-        exception is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.UniqueViolation };
+    private static bool IsRetryableConcurrencyFailure(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException!)
+        {
+            if (current is PostgresException postgres && postgres.SqlState is
+                PostgresErrorCodes.SerializationFailure or
+                PostgresErrorCodes.DeadlockDetected or
+                PostgresErrorCodes.UniqueViolation)
+                return true;
+        }
+
+        return false;
+    }
 
     private static void ValidatePair(Guid from, Guid to)
     {
