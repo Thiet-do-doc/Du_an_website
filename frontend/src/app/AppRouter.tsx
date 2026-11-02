@@ -8,6 +8,7 @@ import SafetyAdminPanel from '../features/safety-admin/SafetyAdminPanel';
 import BlocksPage from '../features/safety-admin/BlocksPage';
 import AuthenticatedChatPage from '../features/chat-notifications/pages/AuthenticatedChatPage';
 import ProfilePage from '../features/profiles/ProfilePage';
+import MemberProfilePage from '../features/profiles/MemberProfilePage';
 import DiscoveryPage from '../features/discovery-matching/pages/DiscoveryPage';
 import FeedPage from '../features/posts/FeedPage';
 import { WalletPage } from './ComingSoonPages';
@@ -74,9 +75,11 @@ export default function AppRouter() {
   if (mode && !['login', 'register'].includes(mode)) return <App mode={mode} />;
   if (!auth.ready) return <div className="session-loading"><Brand /><p role="status">Đang mở mylove…</p></div>;
   if (!auth.session) return <div onClick={navigate}><App mode={mode ?? 'login'} /></div>;
+  const memberId = new URLSearchParams(location.search).get('user');
   const content = path === '/' || path === '/login' || path === '/register' ? <FeedPage /> :
     path === '/discover' ? <DiscoveryPage /> : path === '/chat' ? <AuthenticatedChatPage /> :
-    path === '/profile' ? <ProfilePage /> : path === '/account' ? <AccountPage /> :
+    path === '/profile' ? (memberId && memberId.toLowerCase() !== auth.session.user.id.toLowerCase()
+      ? <MemberProfilePage key={memberId} userId={memberId} /> : <ProfilePage />) : path === '/account' ? <AccountPage /> :
     path === '/admin' ? <AdminPage /> : path === '/safety' ? <SafetyAdminPanel /> :
     path === '/blocks' ? <BlocksPage /> : path === '/gifts' ? <GiftsPage /> : path === '/wallet' ? <WalletPage /> :
     <section className="ml-card empty-feature"><h1>Trang này chưa có ở mylove.</h1><a className="btn btn-dark" href="/">Về trang chủ</a></section>;

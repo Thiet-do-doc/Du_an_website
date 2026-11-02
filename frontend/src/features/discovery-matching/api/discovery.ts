@@ -34,6 +34,9 @@ export function likeProfile(userId: string): Promise<LikeResult> {
   return request(`/api/v1/user-likes/${encodeURIComponent(userId)}`, { method: 'POST' });
 }
 
+export type ReceivedLike = { userId: string; displayName: string; photoUrl?: string | null };
+export const getReceivedLikes = () => request<ReceivedLike[]>('/api/v1/user-likes/received');
+
 export function passProfile(userId: string): Promise<void> {
   return request(`/api/v1/passes/${encodeURIComponent(userId)}`, { method: 'POST' });
 }

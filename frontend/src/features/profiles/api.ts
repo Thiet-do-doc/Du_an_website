@@ -1,8 +1,10 @@
 import { authenticatedFetch } from '../auth/api';
 import { prepareUpload } from '../../shared/uploadImage';
-import type { Interest, Profile, Photo } from './types';
+import type { Interest, Profile, PublicProfile, Photo } from './types';
 
 export const getMyProfile = () => authenticatedFetch<Profile>('/api/v1/profiles/me');
+export const getPublicProfile = (id: string, signal?: AbortSignal) =>
+  authenticatedFetch<PublicProfile>('/api/v1/profiles/' + encodeURIComponent(id), { signal });
 export const getInterests = () => authenticatedFetch<Interest[]>('/api/v1/interests');
 export const saveProfile = (value: { displayName: string; bio: string; city: string; gender: string;
   isDiscoverable: boolean; interestIds: string[] }) => authenticatedFetch<Profile>('/api/v1/profiles/me', {

@@ -13,7 +13,8 @@ namespace DatingApp.Api.Modules.Posts.Controllers;
 public sealed record CreatePostRequest([StringLength(2000)] string? Content, [StringLength(32)] string? Feeling = null);
 public sealed record CreateCommentRequest([Required, StringLength(1000)] string Content);
 public sealed record PostResponse(Guid Id, Guid AuthorId, string AuthorName, string Content, DateTimeOffset CreatedAtUtc,
-    bool IsMine, string? Feeling, bool HasPhoto, int LikeCount, bool IsLiked, int CommentCount);
+    bool IsMine, string? Feeling, bool HasPhoto, int LikeCount, bool IsLiked, int CommentCount,
+    bool CanOpenAuthorProfile, Guid? AuthorAvatarId);
 
 [ApiController, Authorize(Policy = "User"), Route("api/v1/posts")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -44,7 +45,10 @@ public sealed class PostsController(AppDbContext db, ICurrentUser currentUser) :
                select new PostResponse(p.Id, p.AuthorId, profile.DisplayName, p.Content, p.CreatedAtUtc,
                    p.AuthorId == viewer, p.Feeling, p.PhotoType != null,
                    p.Likes.Count(x => people.Contains(x.UserId)), p.Likes.Any(x => x.UserId == viewer),
-                   p.Comments.Count(x => people.Contains(x.UserId)));
+                   p.Comments.Count(x => people.Contains(x.UserId)),
+                   profile.IsDiscoverable || p.AuthorId == viewer,
+                   profile.Photos.Where(x => x.IsAvatar && (profile.IsDiscoverable || p.AuthorId == viewer))
+                       .Select(x => (Guid?)x.Id).FirstOrDefault());
     }
 
     [HttpGet]
@@ -104,8 +108,7 @@ public sealed class PostsController(AppDbContext db, ICurrentUser currentUser) :
         }
         db.Add(post);
         await db.SaveChangesAsync(ct);
-        return StatusCode(201, new PostResponse(post.Id, author, name, content, post.CreatedAtUtc, true,
-            feeling, post.PhotoType != null, 0, false, 0));
+        return StatusCode(201, await Summaries(VisiblePosts().Where(p => p.Id == post.Id)).SingleAsync(ct));
     }
 
     [HttpPut("{id:guid}/like")]

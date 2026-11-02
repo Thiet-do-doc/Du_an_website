@@ -20,3 +20,7 @@
 .post-comments label { flex: 1; min-width: 8rem; }
 .post-comments time { color: #786973; font-size: .75rem; }
 .post-comments p { white-space: pre-wrap; }
+.post-top .post-avatar { overflow: hidden; text-decoration: none; }
+.post-avatar img, .post-avatar .photo-placeholder { width: 100%; height: 100%; object-fit: cover; }
+.post-author { color: inherit; text-decoration: none; }
+.post-author:hover, .post-author:focus-visible { text-decoration: underline; }

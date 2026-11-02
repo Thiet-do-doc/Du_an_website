@@ -49,10 +49,22 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
   const refreshList = useCallback(async () => {
-    const data = await getConversations(token);
-    setConversations(data.items);
-    setCurrent(prev => prev && data.items.some(x => x.id === prev)
-      ? prev : data.items[0]?.id ?? null);
+    const requested = new URLSearchParams(location.search).get('conversation');
+    const wanted = currentRef.current || requested;
+    let page = 1;
+    let data = await getConversations(token);
+    const items = [...data.items];
+    while (wanted && data.hasMore && !items.some(x => x.id === wanted)) {
+      data = await getConversations(token, ++page);
+      items.push(...data.items);
+    }
+    setConversations(items);
+    setCurrent(prev => {
+      const selected = prev || requested;
+      return selected ? items.find(x => x.id === selected)?.id ?? null : items[0]?.id ?? null;
+    });
+    if (requested && wanted === requested && !items.some(x => x.id === requested))
+      setError('Cuộc trò chuyện này hiện không thể mở.');
   }, [token]);
   const refreshNotifications = useCallback(async () => {
     const data = await getNotifications(token);

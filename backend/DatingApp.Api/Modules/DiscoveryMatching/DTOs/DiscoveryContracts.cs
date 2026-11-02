@@ -11,5 +11,6 @@ public sealed record DiscoveryQuery(
 
 public sealed record DiscoveryPage(IReadOnlyList<ProfileSummary> Items, int Page, int PageSize, bool HasMore);
 public sealed record LikeResponse(bool IsMatch, Guid? MatchId, Guid? ConversationId, DateTime? MatchedAt);
+public sealed record ProfileConnection(string State, Guid? ConversationId = null);
 public sealed record MatchResponse(Guid Id, Guid OtherUserId, Guid ConversationId, DateTime MatchedAt, bool IsActive);
 public sealed record MatchDetailsResponse(Guid Id, Guid OtherUserId, Guid ConversationId, DateTime MatchedAt, bool IsActive, ProfileSummary OtherProfile);

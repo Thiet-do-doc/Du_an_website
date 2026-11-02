@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using ImageMagick;
 using DatingApp.Api.Shared;
 using DatingApp.Api.Modules.SafetyAdmin.Services;
+using DatingApp.Api.Modules.DiscoveryMatching.Services;
 
 namespace DatingApp.Api.Modules.Profiles.Controllers;
 
@@ -17,11 +18,17 @@ public sealed class ProfilesController(ProfileService profiles, PhotoService pho
     public async Task<IActionResult> Mine(CancellationToken ct) => Ok(await profiles.GetMineAsync(currentUser.UserId!.Value, ct));
 
     [Authorize(Policy = "User"), HttpGet("profiles/{id:guid}")]
-    public async Task<IActionResult> Public(Guid id, CancellationToken ct)
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> Public(Guid id, [FromServices] IMatchService matches, CancellationToken ct)
     {
         if (!await blocks.CanInteractAsync(currentUser.UserId!.Value, id, ct)) return NotFound();
         var profile = await profiles.GetPublicAsync(id, ct);
-        return profile is null ? NotFound() : Ok(profile);
+        if (profile is null) return NotFound();
+        var connection = await matches.GetConnectionAsync(currentUser.UserId.Value, id, ct);
+        if (connection.State is ("none" or "received" or "sent") &&
+            !await profiles.CanAppearInDiscoveryAsync(currentUser.UserId.Value, ct))
+            connection = new("needsProfile");
+        return Ok(profile with { Connection = connection });
     }
 
     [Authorize(Policy = "User"), HttpPut("profiles/me")]

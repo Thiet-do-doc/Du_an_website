@@ -97,6 +97,26 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
         }
     }
 
+    public async Task<ProfileConnection> GetConnectionAsync(Guid viewer, Guid other, CancellationToken ct)
+    {
+        if (viewer == other) return new("self");
+        var match = await FindPairAsync(viewer, other, ct);
+        if (match is not null)
+        {
+            if (match.UnmatchedAt is not null) return new("unmatched");
+            var ids = await conversations.GetConversationIdsAsync([match.Id], ct);
+            return new("matched", ids[match.Id]);
+        }
+        var like = await db.UserLikes.Where(x => x.FromUserId == viewer && x.ToUserId == other ||
+                x.FromUserId == other && x.ToUserId == viewer)
+            .Select(x => x.FromUserId == viewer ? "sent" : "received").FirstOrDefaultAsync(ct);
+        return new(like ?? "none");
+    }
+
+    public Task<List<Guid>> GetReceivedLikeIdsAsync(Guid viewer, CancellationToken ct) =>
+        db.UserLikes.Where(x => x.ToUserId == viewer).OrderByDescending(x => x.CreatedAt)
+            .Select(x => x.FromUserId).ToListAsync(ct);
+
     public async Task<IReadOnlyList<MatchResponse>> GetMatchesAsync(Guid userId, CancellationToken cancellationToken)
     {
         var matches = await db.Matches.AsNoTracking()

@@ -12,7 +12,10 @@ public sealed record MyProfileResponse(Guid UserId, string DisplayName, int Age,
 // discoverability switch, or private completion state.
 public sealed record PublicProfileResponse(Guid UserId, string DisplayName, int Age, string? Bio,
     string? City, string? Gender, IReadOnlyCollection<PhotoResponse> Photos,
-    IReadOnlyCollection<InterestResponse> Interests);
+    IReadOnlyCollection<InterestResponse> Interests)
+{
+    public DiscoveryMatching.DTOs.ProfileConnection? Connection { get; init; }
+}
 
 public sealed record PhotoResponse(Guid Id, string Url, bool IsAvatar, int SortOrder);
 public sealed record InterestResponse(Guid Id, string Name);

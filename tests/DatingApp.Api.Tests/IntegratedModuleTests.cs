@@ -39,6 +39,11 @@ public sealed partial class AuthFlowTests
         var photoPath = $"photos/{photoId}/content";
         Assert.Equal(HttpStatusCode.OK, (await b.GetApi(photoPath, bt)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.GetApi(photoPath, "")).StatusCode);
+        var createdPost = await a.WriteApi(HttpMethod.Post, "posts", new { content = "Author profile link" }, at);
+        var postId = (await createdPost.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var author = await (await b.GetApi($"posts/{postId}", bt)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(author.GetProperty("canOpenAuthorProfile").GetBoolean());
+        Assert.Equal(photoId, author.GetProperty("authorAvatarId").GetGuid());
 
         var page1 = await (await a.GetApi($"discover?city={city}&pageSize=1&page=1", at)).Content.ReadFromJsonAsync<JsonElement>();
         var page2 = await (await a.GetApi($"discover?city={city}&pageSize=1&page=2", at)).Content.ReadFromJsonAsync<JsonElement>();
@@ -46,12 +51,22 @@ public sealed partial class AuthFlowTests
         Assert.Single(page2.GetProperty("items").EnumerateArray());
         Assert.NotEqual(page1.GetProperty("items")[0].GetProperty("userId").GetGuid(), page2.GetProperty("items")[0].GetProperty("userId").GetGuid());
         Assert.Equal(HttpStatusCode.OK, (await a.WriteApi(HttpMethod.Post, $"user-likes/{bob.Id}", new { }, at)).StatusCode);
+        async Task<JsonElement> Connection(Browser viewer, Guid target, string token) =>
+            (await (await viewer.GetApi($"profiles/{target}", token)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("connection");
+        Assert.Equal("sent", (await Connection(a, bob.Id, at)).GetProperty("state").GetString());
+        Assert.Equal("received", (await Connection(b, alice.Id, bt)).GetProperty("state").GetString());
+        var incoming = await (await b.GetApi("user-likes/received", bt)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(alice.Id, Assert.Single(incoming.EnumerateArray()).GetProperty("userId").GetGuid());
         var mutual = await b.WriteApi(HttpMethod.Post, $"user-likes/{alice.Id}", new { }, bt);
         Assert.Equal(HttpStatusCode.OK, mutual.StatusCode);
         var match = await mutual.Content.ReadFromJsonAsync<JsonElement>();
         var conversationId = match.GetProperty("conversationId").GetGuid();
         var matchId = match.GetProperty("matchId").GetGuid();
         Assert.NotEqual(Guid.Empty, conversationId);
+        var connection = await Connection(a, bob.Id, at);
+        Assert.Equal("matched", connection.GetProperty("state").GetString());
+        Assert.Equal(conversationId, connection.GetProperty("conversationId").GetGuid());
+        Assert.Empty((await (await b.GetApi("user-likes/received", bt)).Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray());
         var conversations = await (await a.GetApi("conversations", at)).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("Bob", conversations.GetProperty("items")[0].GetProperty("partnerName").GetString());
         Guid messageId;
@@ -102,6 +117,7 @@ public sealed partial class AuthFlowTests
         Assert.Equal(HttpStatusCode.Created, (await b.WriteApi(HttpMethod.Post, "reports", report, bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await b.WriteApi(HttpMethod.Delete, $"blocks/{alice.Id}", null, bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await a.WriteApi(HttpMethod.Delete, $"matches/{matchId}", null, at)).StatusCode);
+        Assert.Equal("unmatched", (await Connection(a, bob.Id, at)).GetProperty("state").GetString());
         using (var scope = app.Services.CreateScope())
             Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() => scope.ServiceProvider
                 .GetRequiredService<ChatService>().SendMessageAsync(conversationId, alice.Id, "unmatched", Guid.NewGuid()))).StatusCode);

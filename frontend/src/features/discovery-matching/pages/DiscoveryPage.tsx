@@ -1,6 +1,8 @@
 import { PhotoBackground } from '../../profiles/PrivatePhoto';
-import { useEffect, useMemo, useState } from 'react';
-import { getDiscover, getMatches, likeProfile, passProfile, unmatch } from '../api/discovery';
+import { useEffect, useState } from 'react';
+import { getDiscover, getMatches, getReceivedLikes, likeProfile, passProfile, unmatch, type ReceivedLike } from '../api/discovery';
+import { getInterests } from '../../profiles/api';
+import type { Interest } from '../../profiles/types';
 import type { DiscoveryFilters, DiscoveryProfile, MatchSummary } from '../types/discovery';
 
 
@@ -17,6 +19,12 @@ export default function DiscoveryPage() {
   const [filters, setFilters] = useState(initialFilters);
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [matches, setMatches] = useState<MatchSummary[]>([]);
+  const [received, setReceived] = useState<ReceivedLike[]>([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(true);
+  const [connectionsError, setConnectionsError] = useState('');
+  const [interests, setInterests] = useState<Interest[]>([]);
+  const [catalogError, setCatalogError] = useState(false);
+  const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   const [index, setIndex] = useState(0);
@@ -27,10 +35,19 @@ export default function DiscoveryPage() {
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
+    let active = true;
+    setCatalogError(false);
+    getInterests().then(items => { if (active) setInterests(items); })
+      .catch(() => { if (active) setCatalogError(true); });
+    return () => { active = false; };
+  }, [catalogAttempt]);
+
+  useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError('');
     getDiscover(filters, page, controller.signal).then(result => {
+      if (controller.signal.aborted) return;
       setProfiles(current => page === 1 ? result.items : [...current, ...result.items]);
       setHasMore(result.hasMore);
       if (page === 1) setIndex(0);
@@ -41,15 +58,18 @@ export default function DiscoveryPage() {
   }, [filters, page]);
 
   useEffect(() => {
-    if (activeTab !== 'matches') return;
     let current = true;
-    getMatches().then(value => { if (current) { setMatches(value); setError(''); } })
-      .catch(reason => { if (current) setError(reason instanceof Error ? reason.message : 'Không tải được kết nối.'); });
+    setConnectionsLoading(true); setConnectionsError('');
+    Promise.all([getMatches(), getReceivedLikes()]).then(([connections, likes]) => {
+      if (current) { setMatches(connections); setReceived(likes); }
+    })
+      .catch(() => { if (current) setConnectionsError('Chưa tải được lời thích và kết nối.'); })
+      .finally(() => { if (current) setConnectionsLoading(false); });
     return () => { current = false; };
   }, [activeTab]);
 
   const profile = profiles[index];
-  const interests = useMemo(() => Array.from(new Set(profiles.flatMap(item => item.interests))).sort(), [profiles]);
+  const connectionCount = connectionsLoading || connectionsError ? null : received.length + matches.length;
   const today = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 
   async function advance(action: 'like' | 'pass') {
@@ -85,14 +105,14 @@ export default function DiscoveryPage() {
       await unmatch(id);
       setMatches(current => current.filter(match => match.id !== id));
       setNotice('Đã bỏ ghép đôi. Quyền gửi tin mới đã bị thu hồi.');
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Không thể bỏ ghép đôi.'); }
+    } catch (reason) { setConnectionsError(reason instanceof Error ? reason.message : 'Không thể bỏ ghép đôi.'); }
   }
 
   return <div className="dating-shell">
     <header className="dating-topbar">
       <nav className="dating-nav" aria-label="Điều hướng chính">
         <button className={activeTab === 'discover' ? 'nav-item selected' : 'nav-item'} onClick={() => { setError(''); setActiveTab('discover'); }}>Khám phá</button>
-        <button className={activeTab === 'matches' ? 'nav-item selected' : 'nav-item'} onClick={() => { setError(''); setActiveTab('matches'); }}>Kết nối <span className="nav-count">{matches.length}</span></button>
+        <button className={activeTab === 'matches' ? 'nav-item selected' : 'nav-item'} onClick={() => { setError(''); setActiveTab('matches'); }}>Kết nối {connectionCount !== null && <span className="nav-count">{connectionCount}</span>}</button>
       </nav>
 
     </header>
@@ -101,7 +121,7 @@ export default function DiscoveryPage() {
       <aside className="discovery-sidebar">
         <p className="sidebar-eyebrow">KHÔNG GIAN CỦA BẠN</p>
         <button className={activeTab === 'discover' ? 'side-link active' : 'side-link'} onClick={() => setActiveTab('discover')}><span>✳</span> Khám phá</button>
-        <button className={activeTab === 'matches' ? 'side-link active' : 'side-link'} onClick={() => setActiveTab('matches')}><span>♡</span> Lượt thích & kết nối <b>{matches.length}</b></button>
+        <button className={activeTab === 'matches' ? 'side-link active' : 'side-link'} onClick={() => setActiveTab('matches')}><span>♡</span> Lượt thích & kết nối {connectionCount !== null && <b>{connectionCount}</b>}</button>
         <div className="sidebar-note"><span className="note-spark">✳</span><p>Một kết nối tốt bắt đầu bằng sự tò mò chân thành.</p></div>
         <p className="sidebar-foot">Mỗi lời chào là một khởi đầu.</p>
       </aside>
@@ -112,7 +132,8 @@ export default function DiscoveryPage() {
         <div className="filter-row" aria-label="Bộ lọc khám phá">
           <label>Khu vực<select value={filters.city} onChange={e => updateFilter('city', e.target.value)}><option>Tất cả khu vực</option><option>TP. Hồ Chí Minh</option><option>Thủ Đức</option><option>Bình Thạnh</option></select></label>
           <label>Độ tuổi<select value={`${filters.minAge}-${filters.maxAge}`} onChange={e => { const [minAge, maxAge] = e.target.value.split('-').map(Number); setFilters(f => ({ ...f, minAge, maxAge })); setPage(1); setIndex(0); setProfiles([]); }}><option value="18-35">18 – 35</option><option value="18-25">18 – 25</option><option value="23-30">23 – 30</option><option value="25-35">25 – 35</option></select></label>
-          <label>Sở thích<select value={filters.interest} onChange={e => updateFilter('interest', e.target.value)}><option>Tất cả sở thích</option>{interests.map(item => <option key={item}>{item}</option>)}</select></label>
+          <label>Sở thích<select aria-label="Sở thích" value={filters.interest} onChange={e => updateFilter('interest', e.target.value)}><option>Tất cả sở thích</option>{interests.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select></label>
+          {catalogError && <button type="button" onClick={() => setCatalogAttempt(n => n + 1)}>Tải lại danh mục sở thích</button>}
           <span className="profile-count">{profiles.length} hồ sơ đã tải</span>
         </div>
 
@@ -131,14 +152,20 @@ export default function DiscoveryPage() {
           <div className="stage-aside"><div className="daily-prompt"><span>✳ GỢI Ý HÔM NAY</span><p>Hỏi về điều khiến họ quên mất thời gian.</p></div><div className="privacy-note"><span>♧</span><p>Thông tin của bạn chỉ hiển thị với người phù hợp. Bạn luôn có thể bỏ qua hoặc chặn.</p></div></div>
         </div> : <div className="empty-state"><DotOrbit /><h2>{error ? 'Chưa tải được hồ sơ.' : 'Bạn đã xem hết hồ sơ.'}</h2><p>{error ? 'Hãy hoàn thiện hồ sơ hoặc thử lại sau.' : 'Thử nới bộ lọc để gặp thêm người mới nhé.'}</p>{hasMore ? <button onClick={() => setPage(current => current + 1)}>Tải thêm hồ sơ</button> : <button onClick={() => { setFilters({ ...initialFilters }); setPage(1); setIndex(0); setProfiles([]); }}>Đặt lại bộ lọc</button>}</div>}
         <p className="interaction-notice" aria-live="polite">{notice}</p>
-      </section> : <MatchesView matches={matches} error={error} onDiscover={() => setActiveTab('discover')} onUnmatch={removeMatch} />}
+      </section> : connectionsLoading ? <p role="status">Đang tải lời thích và kết nối…</p> :
+        <MatchesView matches={matches} received={received} error={connectionsError} onDiscover={() => setActiveTab('discover')} onUnmatch={removeMatch} />}
     </main>
   </div>;
 }
 
-function MatchesView({ matches, error, onDiscover, onUnmatch }: { matches: MatchSummary[]; error: string; onDiscover: () => void; onUnmatch: (id: string) => void }) {
+function MatchesView({ matches, received, error, onDiscover, onUnmatch }: { matches: MatchSummary[]; received: ReceivedLike[]; error: string; onDiscover: () => void; onUnmatch: (id: string) => void }) {
   return <section className="discover-main matches-main"><div className="discover-heading"><div><p className="sidebar-eyebrow">NHỮNG KẾT NỐI CỦA BẠN</p><h1>Chuyện hay <em>bắt đầu từ đây.</em></h1><p>Các bạn đã cùng gửi lời thích cho nhau.</p></div></div>
     {error && <p className="interaction-notice" role="alert">{error}</p>}
+    <section aria-label="Lời thích nhận được" className="received-likes"><h2>Lời thích nhận được</h2>
+      {received.length ? <ul>{received.map(person => <li key={person.userId}>
+        <a href={'/profile?user=' + person.userId}>{person.displayName} · Xem hồ sơ</a>
+      </li>)}</ul> : !error && <p>Chưa có lời thích đang chờ.</p>}
+    </section>
     {matches.length ? <div className="matches-grid">{matches.map(match => <article className="match-card" key={match.id}><PhotoBackground className="match-photo" photoUrl={match.otherProfile.photoUrl} /><div className="match-copy"><span className="match-kicker">✳ CÓ DUYÊN GẶP GỠ</span><h2>{match.otherProfile.name}, {match.otherProfile.age}</h2><p>{match.otherProfile.city} · {new Date(match.matchedAt).toLocaleDateString('vi-VN')}</p><a className="btn btn-dark" href={`/chat?conversation=${encodeURIComponent(match.conversationId)}`}>Mở cuộc trò chuyện <span>↗</span></a><button onClick={() => onUnmatch(match.id)}>Bỏ ghép đôi</button></div></article>)}</div> : <div className="empty-state matches-empty"><span>♡</span><h2>{error ? 'Chưa tải được kết nối.' : 'Kết nối của bạn sẽ ở đây.'}</h2><p>{error || 'Hãy khám phá và gửi lời thích nhé.'}</p><button onClick={onDiscover}>Khám phá hồ sơ</button></div>}
   </section>;
 }

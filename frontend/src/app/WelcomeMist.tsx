@@ -15,7 +15,11 @@ const loginWelcome = 'mylove.login-welcome';
 export function finishSignIn() {
   sessionStorage.setItem(loginWelcome, '1');
   const post = new URLSearchParams(location.search).get('post');
-  location.replace(post ? '/?post=' + encodeURIComponent(post) : '/');
+  if (location.pathname === '/profile' && new URLSearchParams(location.search).has('user')) {
+    location.reload();
+  } else {
+    location.replace(post ? '/?post=' + encodeURIComponent(post) : '/');
+  }
 }
 export function LoginWelcome() {
   const [show] = useState(() => sessionStorage.getItem(loginWelcome) === '1');

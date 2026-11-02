@@ -5,6 +5,7 @@ import { PrivatePhoto } from '../profiles/PrivatePhoto';
 export type Post = {
   id: string; authorId: string; authorName: string; content: string; createdAtUtc: string; isMine: boolean;
   hasPhoto: boolean; feeling: string | null; likeCount: number; isLiked: boolean; commentCount: number;
+  canOpenAuthorProfile: boolean; authorAvatarId: string | null;
 };
 type Comment = { id: string; authorName: string; content: string; createdAtUtc: string };
 type CommentsPage = { items: Comment[]; hasMore: boolean };
@@ -23,6 +24,10 @@ export function PostCard({ post, onChange, onDelete, deleting }: {
   const [shareNotice, setShareNotice] = useState('');
   const [copyLink, setCopyLink] = useState(false);
   const path = '/api/v1/posts/' + post.id;
+  const profileUrl = post.isMine ? '/profile' : '/profile?user=' + encodeURIComponent(post.authorId);
+  const avatar = post.authorAvatarId
+    ? <PrivatePhoto src={'/api/v1/photos/' + post.authorAvatarId + '/content'} alt="" />
+    : post.authorName.slice(0, 1).toUpperCase();
   const link = new URL('/?post=' + post.id, location.origin).href;
   async function run(action: () => Promise<void>) {
     setBusy(true); setError('');
@@ -60,8 +65,10 @@ export function PostCard({ post, onChange, onDelete, deleting }: {
     catch { setCopyLink(true); }
   }
   return <article className="ml-card post-card">
-    <header className="post-top"><span className="post-avatar" aria-hidden="true">{post.authorName.slice(0, 1).toUpperCase()}</span>
-      <div><h3>{post.authorName}{post.isMine && ' · Bạn'}</h3>
+    <header className="post-top">{post.canOpenAuthorProfile
+      ? <a href={profileUrl} className="post-avatar" aria-label={'Xem hồ sơ của ' + post.authorName}>{avatar}</a>
+      : <span className="post-avatar" aria-hidden="true">{avatar}</span>}
+      <div><h3>{post.canOpenAuthorProfile ? <a className="post-author" href={profileUrl}>{post.authorName}</a> : post.authorName}{post.isMine && ' · Bạn'}</h3>
         <time dateTime={post.createdAtUtc}>{date(post.createdAtUtc)}</time></div>
       {post.isMine && <button type="button" className="post-delete" disabled={deleting} onClick={onDelete}>Xóa bài</button>}
     </header>
