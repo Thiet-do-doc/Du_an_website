@@ -22,7 +22,9 @@ public sealed class ReportsController(AppDbContext db, UserManager<ApplicationUs
         if (!Enum.IsDefined(request.TargetType)) return BadRequest(new { message = "Target type không hợp lệ." });
         if (request.TargetType == ReportTargetType.Post)
             return StatusCode(StatusCodes.Status501NotImplemented,
-                new { message = "Module sở hữu tin nhắn/bài viết chưa cung cấp kiểm tra quyền đối tượng báo cáo." });
+                new { message = "Báo cáo bài viết chưa nằm trong phạm vi tuần 3." });
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Description.Trim().Length < 10)
+            return BadRequest(new { message = "Cần lý do và mô tả ít nhất 10 ký tự." });
         var actorId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (actorId is null) return Unauthorized();
         string? targetUserId = null;
@@ -36,14 +38,15 @@ public sealed class ReportsController(AppDbContext db, UserManager<ApplicationUs
         if (request.TargetType == ReportTargetType.User)
         {
             targetUserId = request.TargetId.Trim();
-            if (targetUserId == actorId) return BadRequest(new { message = "Bạn không thể báo cáo chính mình." });
+            if (Guid.TryParse(targetUserId, out var selfId) && Guid.TryParse(actorId, out var reporterGuid) && selfId == reporterGuid) return BadRequest(new { message = "Bạn không thể báo cáo chính mình." });
             if (!Guid.TryParse(targetUserId, out var targetGuid)) return BadRequest();
+            targetUserId = targetGuid.ToString();
             if (await users.FindByIdAsync(targetGuid.ToString()) is null) return NotFound(new { message = "Không tìm thấy người dùng được báo cáo." });
         }
         var report = new UserReport
         {
             Id = Guid.NewGuid(), ReporterUserId = actorId, TargetType = request.TargetType,
-            TargetId = request.TargetId.Trim(), TargetUserId = targetUserId,
+            TargetId = Guid.Parse(request.TargetId.Trim()).ToString(), TargetUserId = targetUserId,
             Reason = request.Reason.Trim(), Description = request.Description.Trim()
         };
         db.Reports.Add(report);

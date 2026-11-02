@@ -1,5 +1,6 @@
+import ReportForm from './components/ReportForm';
 import { authenticatedFetch } from '../auth/api';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
 
 type ReportType = 'User' | 'Message' | 'Post';
 type ReportStatus = 'Pending' | 'Reviewed' | 'Dismissed' | 'Actioned';
@@ -15,10 +16,6 @@ const request = <T,>(path: string, init: RequestInit = {}) => authenticatedFetch
 });
 
 export default function SafetyAdminPanel() {
-  const [targetType, setTargetType] = useState<ReportType>('User');
-  const [targetId, setTargetId] = useState(new URLSearchParams(location.search).get('user') ?? '');
-  const [reason, setReason] = useState('');
-  const [description, setDescription] = useState('');
   const [blockTarget, setBlockTarget] = useState(new URLSearchParams(location.search).get('user') ?? '');
   const [isAdmin, setIsAdmin] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
@@ -34,15 +31,6 @@ export default function SafetyAdminPanel() {
   }, []);
   useEffect(() => { void request<{ roles: string[] }>('/api/v1/auth/me').then(me => setIsAdmin(me.roles.includes('Admin'))).catch(() => setIsAdmin(false)); }, []);
   useEffect(() => { if (isAdmin) void loadReports(); }, [isAdmin, loadReports]);
-
-  async function submitReport(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setMessage('');
-    try {
-      await request('/api/v1/reports', { method: 'POST', body: JSON.stringify({ targetType, targetId, reason, description }) });
-      setTargetId(''); setReason(''); setDescription(''); setMessage('Đã gửi báo cáo. Nhóm kiểm duyệt sẽ xem xét.');
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'Không gửi được báo cáo.'); }
-    finally { setBusy(false); }
-  }
 
   async function changeBlock(event: FormEvent | null, action: 'block' | 'unblock') {
     event?.preventDefault(); setBusy(true); setMessage('');
@@ -84,18 +72,7 @@ export default function SafetyAdminPanel() {
         <div className="safety-actions"><button className="btn btn-dark" disabled={busy}>Chặn</button>
           <button type="button" className="btn btn-outline-secondary" disabled={busy || !blockTarget} onClick={() => void changeBlock(null, 'unblock')}>Bỏ chặn</button></div>
       </form>
-      <form className="safety-card" onSubmit={submitReport}>
-        <h3>Gửi báo cáo</h3>
-        <label>Đối tượng<select value={targetType} onChange={e => setTargetType(e.target.value as ReportType)}>
-          <option value="User">Người dùng</option><option value="Message">Tin nhắn</option>
-        </select></label>
-        <label>ID đối tượng<input required maxLength={200} value={targetId} onChange={e => setTargetId(e.target.value)} /></label>
-        <label>Lý do<select required value={reason} onChange={e => setReason(e.target.value)}>
-          <option value="">Chọn lý do</option><option>Quấy rối</option><option>Lừa đảo</option><option>Nội dung không phù hợp</option><option>Khác</option>
-        </select></label>
-        <label>Mô tả<textarea required minLength={10} maxLength={2000} rows={3} value={description} onChange={e => setDescription(e.target.value)} /></label>
-        <button className="btn btn-dark" disabled={busy}>Gửi báo cáo</button>
-      </form>
+      <ReportForm key={location.search} targetType="User" targetId={new URLSearchParams(location.search).get('user') ?? ''} allowTargetSelection />
     </div>
     {isAdmin && <div className="admin-area">
       <div className="panel-heading"><div><p className="eyebrow">DÀNH CHO ADMIN</p><h3>Báo cáo đang chờ</h3></div>
