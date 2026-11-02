@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ImageMagick;
+using DatingApp.Api.Shared;
 using DatingApp.Api.Modules.SafetyAdmin.Services;
 
 namespace DatingApp.Api.Modules.Profiles.Controllers;

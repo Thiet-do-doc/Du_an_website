@@ -1,7 +1,9 @@
 export type Session = { token: string; expiresAt: string; user: { id: string; email: string } };
 export type ApiProblem = { title?: string; detail?: string; errors?: Record<string, string[]> };
 export class ApiError extends Error {
-  constructor(public status: number, public problem: ApiProblem) { super(problem.detail || problem.title || `HTTP ${status}`); }
+  constructor(public status: number, public problem: ApiProblem) {
+    super(Object.values(problem.errors ?? {}).flat()[0] || problem.detail || problem.title || `HTTP ${status}`);
+  }
 }
 let accessToken: string | null = null;
 let refreshTask: Promise<Session | null> | null = null;
@@ -9,9 +11,12 @@ const listeners = new Set<(session: Session | null) => void>();
 export function subscribe(listener: (session: Session | null) => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function publish(session: Session | null) { accessToken = session?.token ?? null; listeners.forEach(listener => listener(session)); }
 async function parse<T>(response: Response): Promise<T> {
-  const body = response.status === 204 ? null : await response.json();
-  if (!response.ok) throw new ApiError(response.status, body ?? {});
-  return body as T;
+  if (!response.ok) {
+    const problem = await response.json().catch(() => ({}));
+    if (response.status === 413) throw new ApiError(413, { title: 'Ảnh quá lớn. Hãy chọn ảnh nhỏ hơn.' });
+    throw new ApiError(response.status, problem ?? {});
+  }
+  return response.status === 204 ? null as T : response.json();
 }
 async function csrf(): Promise<string> {
   const response = await fetch('/api/v1/auth/csrf', { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(15000) });
@@ -52,7 +57,8 @@ export async function authenticatedFetch<T>(path: string, init: RequestInit = {}
   async function send() {
     const headers = new Headers(init.headers);
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-    return fetch(path, { ...init, headers, credentials: 'same-origin', cache: 'no-store', signal: init.signal ?? AbortSignal.timeout(15000) });
+    const timeout = init.body instanceof FormData ? 90000 : 15000;
+    return fetch(path, { ...init, headers, credentials: 'same-origin', cache: 'no-store', signal: init.signal ?? AbortSignal.timeout(timeout) });
   }
   let response = await send();
   if (response.status === 401 && await refresh()) response = await send();

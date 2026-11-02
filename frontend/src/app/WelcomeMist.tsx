@@ -14,7 +14,8 @@ export function WelcomeMist() {
 const loginWelcome = 'mylove.login-welcome';
 export function finishSignIn() {
   sessionStorage.setItem(loginWelcome, '1');
-  location.replace('/');
+  const post = new URLSearchParams(location.search).get('post');
+  location.replace(post ? '/?post=' + encodeURIComponent(post) : '/');
 }
 export function LoginWelcome() {
   const [show] = useState(() => sessionStorage.getItem(loginWelcome) === '1');

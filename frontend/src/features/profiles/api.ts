@@ -1,4 +1,5 @@
 import { authenticatedFetch } from '../auth/api';
+import { prepareUpload } from '../../shared/uploadImage';
 import type { Interest, Profile, Photo } from './types';
 
 export const getMyProfile = () => authenticatedFetch<Profile>('/api/v1/profiles/me');
@@ -8,7 +9,7 @@ export const saveProfile = (value: { displayName: string; bio: string; city: str
   method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value),
 });
 export async function uploadPhoto(file: File): Promise<Photo> {
-  const body = new FormData(); body.set('file', file);
+  const body = new FormData(); body.set('file', await prepareUpload(file));
   return authenticatedFetch<Photo>('/api/v1/photos', { method: 'POST', body });
 }
 export const setAvatar = (id: string) => authenticatedFetch<void>(`/api/v1/photos/${id}/avatar`, { method: 'PUT' });

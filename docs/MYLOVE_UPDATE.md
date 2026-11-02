@@ -14,7 +14,8 @@
 - DELETE `/api/v1/posts/{id}`: chỉ tác giả được xóa; không cho client chọn người đăng.
 - Tất cả endpoint cần JWT hợp lệ; không công khai email/ngày sinh. Lọc tài khoản ngừng hoạt động và chặn hai chiều.
 - Bài viết hiển thị cho thành viên kể cả khi tác giả tắt khám phá hồ sơ, theo thông báo ở form đăng bài. Bài viết là nội dung chia sẻ chủ động riêng với cài đặt khám phá.
-- Chưa bổ sung ảnh bài viết, bình luận, lượt thích hoặc chia sẻ bài viết.
+- Từ migration `AddPostMediaAndInteractions`, bài viết có thể kèm một ảnh và cảm xúc. Gửi multipart gồm `content`, `feeling`, `file`. API vẫn nhận JSON cho bài văn bản.
+- Thành viên thích/bỏ thích bằng PUT/DELETE `/api/v1/posts/{id}/like`, gửi và đọc bình luận qua POST/GET `/api/v1/posts/{id}/comments`. Link `/?post={id}` mở đúng bài sau khi đăng nhập. Bài, ảnh và bình luận đều kiểm tra quyền chặn.
 - Quà tặng và ví mới là giao diện “Sắp ra mắt”; không tạo số dư giả hoặc thực hiện giao dịch tiền.
 
 ## Chạy và cập nhật database
