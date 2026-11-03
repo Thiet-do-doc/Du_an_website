@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import ReportForm from '../../safety-admin/components/ReportForm';
 import { GiftArt } from '../../gifts/GiftArt';
 import { HubConnection, HubConnectionBuilder, HubConnectionState,
   HttpTransportType, LogLevel } from '@microsoft/signalr';
-import { getConversations, getMessages, getNotifications, markRead, reportMessage } from '../api/chatApi';
+import { getConversations, getMessages, getNotifications, markRead } from '../api/chatApi';
 import type { ChatNotification, Conversation, Delivery, Message } from '../types/chat';
 
 type Props = { token: string; userId: string; displayName: string; getAccessToken?: () => Promise<string> };
@@ -38,6 +39,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
   const connectionRef = useRef<HubConnection | null>(null);
   const currentRef = useRef(current);
   const messagesRef = useRef(messages);
@@ -281,25 +283,6 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       setNotificationCursor(page.nextCursor);
     } catch (e) { setError(String(e)); } finally { setNotificationBusy(false); }
   };
-  const report = async (item: Message) => {
-    const reason = window.prompt('Lý do báo cáo tin nhắn:');
-    if (!reason?.trim()) return;
-    const description = window.prompt('Mô tả thêm (ít nhất 10 ký tự):');
-    if (!description || description.trim().length < 10) {
-      setError('Mô tả báo cáo phải có ít nhất 10 ký tự.');
-      return;
-    }
-    try {
-      await reportMessage(token, item.id, reason.trim(), description.trim());
-      setFeedback(`Đã gửi báo cáo cho tin nhắn ${item.id}.`);
-      setError('');
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      if (/HTTP 404|HTTP 501/.test(message)) {
-        setError(`Yêu cầu báo cáo đã gửi đúng messageId ${item.id}, nhưng API xử lý báo cáo Message của TV5 chưa được tích hợp (lỗi ${message.match(/HTTP (404|501)/)?.[1]}).`);
-      } else setError(message);
-    }
-  };
   const active = conversations.find(x => x.id === current);
   const unread = notifications.filter(x => !x.readAt).length;
 
@@ -314,6 +297,11 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
         <button onClick={() => setError('')} aria-label="Đóng lỗi">✕</button></div>}
       {feedback && <div role="status" className="feedback"><span>{feedback}</span>
         <button onClick={() => setFeedback('')} aria-label="Đóng thông báo">✕</button></div>}
+      {reportTarget && <section aria-label="Báo cáo tin nhắn">
+        <button type="button" onClick={() => setReportTarget(null)}>Đóng form báo cáo</button>
+        <ReportForm key={reportTarget} targetType="Message" targetId={reportTarget}
+          onSubmitted={() => { setReportTarget(null); setFeedback('Đã gửi báo cáo tin nhắn. Nhóm kiểm duyệt sẽ xem xét.'); }} />
+      </section>}
       <div className="layout">
         <aside className="conversations">
           <div className="section-heading"><h2>Hội thoại</h2><span>{conversations.length}</span></div>
@@ -338,7 +326,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
               <div className="bubble">{m.giftCode && <><GiftArt code={m.giftCode}/><small>Quà tặng mylove</small></>}<div className="bubble-text">{m.content}</div>
                 <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
                 {m.senderId !== userId && <button type="button" className="report-message"
-                  onClick={() => void report(m)}>Báo cáo</button>}
+                  onClick={() => setReportTarget(m.id)}>Báo cáo</button>}
               </div></div>)}
             {pending.map(p => <div className="bubble-row mine" key={p.clientMessageId}>
               <div className="bubble pending"><div className="bubble-text">{p.content}</div>
