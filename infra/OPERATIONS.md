@@ -1,5 +1,7 @@
 # Khung vận hành #21
 
+Khi triển khai bản có admin audit (#31), dùng [runbook Tuần 4](../docs/ISSUE_31_STAGING.md) cho thứ tự build, migrate, HTTPS và nghiệm thu A/B/C.
+
 ## Biến cấu hình
 
 Copy `.env.example` sang `.env` (đã ignore), tự điền secret. Compose đọc `.env`;

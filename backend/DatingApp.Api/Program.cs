@@ -161,6 +161,14 @@ builder.Services.AddScoped<IDatabaseProbe, PostgresDatabaseProbe>();
 
 var app = builder.Build();
 
+// One-shot command for a release operator on the private Compose network.
+if (builder.Configuration.GetValue<bool>("migrate"))
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    return;
+}
+
 // Chỉ cấp Admin cho tài khoản đã xác nhận bằng lệnh local có kiểm soát.
 if (builder.Configuration["grant-admin"] is string adminEmail)
 {
