@@ -95,7 +95,14 @@ public sealed partial class AuthFlowTests
         Assert.Equal(HttpStatusCode.OK, (await b.GetApi($"conversations/{conversationId}/messages", bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetApi($"conversations/{conversationId}/messages", ct)).StatusCode);
         var report = new { targetType = "Message", targetId = messageId, reason = "Test report", description = "Integration test only" };
-        Assert.Equal(HttpStatusCode.Created, (await b.WriteApi(HttpMethod.Post, "reports", report, bt)).StatusCode);
+        var submitted = await b.WriteApi(HttpMethod.Post, "reports", report, bt);
+        Assert.Equal(HttpStatusCode.Created, submitted.StatusCode);
+        var reportId = (await submitted.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var reviewUrl = $"admin/reports/{reportId}";
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.GetApi(reviewUrl, bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.GetApi(reviewUrl + "/actions", bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.WriteApi(HttpMethod.Post, reviewUrl + "/evidence", null, bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.WriteApi(HttpMethod.Patch, reviewUrl, new { status = "Actioned", notes = "Test review" }, bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.WriteApi(HttpMethod.Post, "reports", report, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await a.WriteApi(HttpMethod.Post, "reports", report, at)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await a.GetApi("admin/reports", at)).StatusCode);
@@ -129,8 +136,20 @@ public sealed partial class AuthFlowTests
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(outsider.Id.ToString()))!, "Admin")).Succeeded);
         }
-        Assert.Equal(HttpStatusCode.OK, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", new
-            { isActive = false, reason = "Integration test suspension" }, ct)).StatusCode);
+        var details = await (await c.GetApi(reviewUrl, ct)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(messageId.ToString(), details.GetProperty("targetId").GetString());
+        Assert.False(details.TryGetProperty("content", out _));
+        var evidence = await (await c.WriteApi(HttpMethod.Post, reviewUrl + "/evidence", null, ct)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(messageId, evidence.GetProperty("id").GetGuid());
+        Assert.Equal("Hello from integrated modules", evidence.GetProperty("content").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetApi($"conversations/{conversationId}/messages", ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, reviewUrl, new { status = "Pending", notes = "Invalid transition" }, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, reviewUrl, new { status = "Reviewed", notes = "  " }, ct)).StatusCode);
+        var hold = new { isActive = false, reason = "Integration test suspension", reportId };
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", hold, bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{bob.Id}/status", hold, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", new { hold.reason, reportId }, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", hold, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await a.Get("me", at)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await a.Post("refresh")).StatusCode);
         using (var scope = app.Services.CreateScope())
@@ -138,6 +157,26 @@ public sealed partial class AuthFlowTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             Assert.True(await db.ModerationActions.AnyAsync(x => x.TargetUserId == alice.Id.ToString()));
             Assert.False(await db.RefreshTokens.AnyAsync(x => x.UserId == alice.Id && x.RevokedAtUtc == null));
+        }
+        Assert.Equal(HttpStatusCode.OK, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status",
+            new { isActive = true, reason = "Appeal accepted", reportId }, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await a.Get("me", at)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await a.Post("login", new { alice.Email, Password })).StatusCode);
+        var decision = new { status = "Actioned", notes = "Reviewed test evidence" };
+        foreach (var response in await Task.WhenAll(Enumerable.Range(0, 2).Select(_ =>
+            c.WriteApi(HttpMethod.Patch, reviewUrl, decision, ct)))) Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await c.WriteApi(HttpMethod.Patch, reviewUrl,
+            new { status = "Dismissed", notes = "Conflicting decision" }, ct)).StatusCode);
+        var history = await (await c.GetApi(reviewUrl + "/actions", ct)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(new[] { "MessageEvidenceRead", "AccountSuspended", "AccountReactivated", "ReportActioned" },
+            history.EnumerateArray().Select(x => x.GetProperty("action").GetString()));
+        foreach (var row in history.EnumerateArray())
+        {
+            Assert.Equal(reportId, row.GetProperty("reportId").GetGuid());
+            Assert.Equal(outsider.Id.ToString(), row.GetProperty("actorUserId").GetString());
+            Assert.Equal(alice.Id.ToString(), row.GetProperty("targetUserId").GetString());
+            Assert.False(string.IsNullOrWhiteSpace(row.GetProperty("reason").GetString()));
+            Assert.Equal(DateTimeKind.Utc, row.GetProperty("createdAtUtc").GetDateTime().Kind);
         }
     }
 
