@@ -14,8 +14,9 @@ public sealed record UpdateReportRequest(
     [MaxLength(2000)] string? Notes);
 
 public sealed record UpdateUserStatusRequest(
-    bool IsActive,
-    [Required, MinLength(5), MaxLength(500)] string Reason);
+    [property: System.Text.Json.Serialization.JsonRequired] bool IsActive,
+    [Required, MinLength(5), MaxLength(500)] string Reason,
+    Guid? ReportId = null);
 
 public sealed record ReportResponse(
     Guid Id, string ReporterUserId, ReportTargetType TargetType, string TargetId,

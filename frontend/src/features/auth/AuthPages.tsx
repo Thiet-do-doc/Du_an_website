@@ -2,6 +2,7 @@
 import { ApiError, authenticatedFetch, publicPost } from './api';
 import { ProtectedRoute, useAuth } from './AuthProvider';
 import { EmailCodePage, startEmailVerification } from './EmailCodePage';
+import AdminReports from '../safety-admin/AdminReports';
 import { finishSignIn } from '../../app/WelcomeMist';
 export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'confirm-email' | 'resend-confirmation' | 'verify-email';
 type Mode = Exclude<AuthMode, 'verify-email'>;
@@ -82,13 +83,7 @@ function AccountContent() {
       <p>Vai trò: {me.roles.length ? me.roles.join(', ') : 'Người dùng'}</p></> : <p role="status">Đang tải tài khoản…</p>}
     {error && <p role="alert">{error}</p>}
     <button className="btn btn-dark" disabled={busy} onClick={() => { void signOut(); }}>Đăng xuất</button>
-    <nav className="auth-links"><a href="/admin">Kiểm tra quyền quản trị</a><a href="/">Về trang chủ</a></nav></section>;
+    <nav className="auth-links">{me?.roles.includes('Admin') && <a href="/admin">Quản lý báo cáo</a>}<a href="/">Về trang chủ</a></nav></section>;
 }
 export function AccountPage() { return <ProtectedRoute><AccountContent /></ProtectedRoute>; }
-function AdminContent() {
-  const [message, setMessage] = useState('Đang kiểm tra quyền…');
-  useEffect(() => { void authenticatedFetch('/api/v1/auth/admin-check').then(() => setMessage('Bạn có quyền quản trị.'))
-    .catch(error => setMessage(error instanceof ApiError && error.status === 403 ? 'Bạn không có quyền quản trị.' : error.message)); }, []);
-  return <section className="auth-panel"><h1>Quyền quản trị</h1><p role="status">{message}</p><a href="/account">Về tài khoản</a></section>;
-}
-export function AdminPage() { return <ProtectedRoute><AdminContent /></ProtectedRoute>; }
+export function AdminPage() { return <ProtectedRoute><AdminReports /></ProtectedRoute>; }
