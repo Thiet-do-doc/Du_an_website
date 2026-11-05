@@ -122,6 +122,14 @@ nhưng nghiệm thu chat–khóa xuyên module chờ TV4/TV5 triển khai module
 
 ## Cấp Admin và production
 
+Khi chạy local, sau bước migration, khởi tạo tài khoản quản trị từ thư mục gốc bằng lệnh riêng:
+
+```powershell
+dotnet run --project backend/DatingApp.Api --launch-profile http -- --init-admin
+```
+
+Lệnh chỉ chạy trong Development. Lần đầu, terminal hiển thị email `admin@mylove.test` và mật khẩu ngẫu nhiên một lần. Lưu mật khẩu, chạy website như thường lệ, đăng nhập tại `/login` rồi mở **An toàn** (`/safety`) để duyệt báo cáo. Chạy lại lệnh với cùng database sẽ giữ nguyên mật khẩu và quyền hiện tại. Nếu email đã thuộc về tài khoản thường, lệnh dừng.
+
 Không có trường role trong Register và không có endpoint tự nâng quyền.
 Chủ vận hành chạy lệnh có kiểm soát cho tài khoản đã xác nhận và đang hoạt động:
 

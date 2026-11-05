@@ -161,7 +161,18 @@ builder.Services.AddScoped<IDatabaseProbe, PostgresDatabaseProbe>();
 
 var app = builder.Build();
 
-// Chỉ cấp Admin cho tài khoản đã xác nhận bằng lệnh local có kiểm soát.
+if (args.Contains("--init-admin"))
+{
+    if (!app.Environment.IsDevelopment())
+        throw new InvalidOperationException("--init-admin chỉ dùng trong môi trường Development.");
+    if (string.IsNullOrWhiteSpace(connectionString))
+        throw new InvalidOperationException("Cần cấu hình ConnectionStrings:DefaultConnection và chạy migration trước.");
+
+    using var scope = app.Services.CreateScope();
+    await AdminProvisioning.CreateLocalAdminAsync(scope.ServiceProvider);
+    return;
+}
+
 if (builder.Configuration["grant-admin"] is string adminEmail)
 {
     using var scope = app.Services.CreateScope();
@@ -170,14 +181,7 @@ if (builder.Configuration["grant-admin"] is string adminEmail)
     var user = await users.FindByEmailAsync(adminEmail);
     if (user is null || !user.EmailConfirmed || !user.IsActive)
         throw new InvalidOperationException("Chỉ cấp Admin cho tài khoản đang hoạt động và đã xác nhận email.");
-    if (!await roles.RoleExistsAsync("Admin"))
-    {
-        var roleResult = await roles.CreateAsync(new IdentityRole<Guid>("Admin"));
-        if (!roleResult.Succeeded) throw new InvalidOperationException("Không tạo được vai trò Admin.");
-    }
-    var result = await users.AddToRoleAsync(user, "Admin");
-    if (!result.Succeeded && !await users.IsInRoleAsync(user, "Admin"))
-        throw new InvalidOperationException("Không cấp được vai trò Admin.");
+    await AdminProvisioning.GrantRoleAsync(users, roles, user);
     return;
 }
 
