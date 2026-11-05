@@ -30,6 +30,7 @@
 @keyframes welcome-float { 50% { transform: translateY(-5px); } }
 .welcome-story h1 { animation: welcome-float 4.6s ease-in-out 2; }
 .polaroid img { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; object-position: center 38%; }
+.polaroid-0 img { object-position: center 62%; }
 .welcome-form .auth-glass {
   position: relative;
   isolation: isolate;
