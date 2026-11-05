@@ -1,6 +1,6 @@
 # Tuần 4 · Khuyến · Admin audit và staging (#31)
 
-**Trạng thái bàn giao:** commit chức năng `2ae1245` đã qua kiểm thử cục bộ. Nhóm đã cung cấp [URL staging](https://mylove.180-93-194-66.sslip.io/). Kiểm tra công khai thành công trên build đang phục vụ. Bước còn chờ là triển khai bản Tuần 4 qua kênh được nhóm cấp quyền và nghiệm thu A/B/C trên đúng commit với Thiết.
+Khuyến bàn giao chức năng admin audit ở commit `2ae1245`, kèm kết quả kiểm thử và kịch bản nghiệm thu. Thiết phụ trách triển khai bản đã review lên [staging của nhóm](https://mylove.180-93-194-66.sslip.io/) và ghi SHA đã triển khai. Khi Thiết báo bản mới sẵn sàng, Khuyến kiểm tra luồng báo cáo, audit và khóa/mở tài khoản qua giao diện.
 
 ## API và màn hình quản trị
 
@@ -17,7 +17,7 @@
 
 Khóa/mở dùng `IAccountAccess` của Auth, thay đổi trạng thái, thu hồi phiên và ghi audit trong cùng transaction. Sau commit, các kết nối Hub của tài khoản bị ngắt. Người được mở khóa phải đăng nhập lại. Nhật ký cũ chỉ xuất hiện dưới báo cáo khi đã có ReportId. Bản này dùng các bảng Reports và ModerationActions hiện hành.
 
-## Triển khai trên host Linux đã cấp quyền
+## Các bước dành cho Thiết khi triển khai trên host Linux
 
 1. Chuẩn bị Docker với Compose v2, Node 24 để chạy smoke, tên miền trỏ về host, chứng chỉ TLS hợp lệ và tài khoản SMTP thử. Dùng project name cố định để lần cập nhật sau nhận đúng volume. Với staging đang vận hành, dùng **đúng project name hiện tại**, sao lưu trước migration và hẹn khung bảo trì với nhóm.
 2. Checkout đúng commit đã review. Ghi SHA, tạo `.env` từ `.env.example` cho lần cài mới, giới hạn quyền đọc file. Điền DB, JWT key ngẫu nhiên ít nhất 32 byte, URL frontend HTTPS, địa chỉ gửi và thông số SMTP. Dùng mật khẩu DB sinh ngẫu nhiên dạng hex để tương thích connection string. File này giữ riêng trên host. Nếu đã có volume, dùng thông tin xác thực hiện hành.
@@ -53,7 +53,7 @@ docker compose ps
 | Thiện, Mạnh | A/B tìm và like nhau; vào chat, gửi hai tin thử. B báo cáo một tin của A. Mở DevTools Network → WS | Hai phía thấy tin; đường /hubs/chat qua HTTPS nâng cấp 101; hiển thị lại lịch sử sau tải lại. |
 | Khuyến, Thiết | B mở /admin và gọi GET /api/v1/admin/reports bằng token thành viên. C mở báo cáo và bấm xem bằng chứng | B nhận 403. C chỉ thấy tin đã báo cáo, thao tác đọc có người xem và giờ UTC. |
 | Khuyến | C khóa A từ báo cáo. A thử dùng phiên cũ để tải dữ liệu/gửi tin; C mở lại và đánh dấu Đã xử lý | Phiên và Hub cũ bị thu hồi. A đăng nhập lại được. Lọc Đã xử lý để xem đúng lý do và thứ tự các thao tác. |
-| Khuyến | Ghi ID report thử; trong khung kiểm tra chạy `docker compose restart postgres api web`, đợi healthy, chạy lại smoke và mở report | Cùng ID, quyết định, lịch sử và hồ sơ còn đủ. |
+| Thiết và Khuyến | Khuyến ghi ID report thử. Thiết chạy `docker compose restart postgres api web` trong khung kiểm tra và đợi healthy. Khuyến mở lại report trên giao diện. | Cùng ID, quyết định, lịch sử và hồ sơ còn đủ. |
 
 Nếu deploy lỗi, giữ volume, xem trạng thái container và log lỗi đã che dữ liệu nhạy cảm. Nếu migration chưa áp dụng, có thể build lại commit trước. Nếu schema đã đổi, đối chiếu tính tương thích với Thiết trước khi hạ bản ứng dụng hoặc khôi phục backup.
 
