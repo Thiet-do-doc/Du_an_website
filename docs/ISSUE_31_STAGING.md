@@ -1,6 +1,6 @@
 # Tuần 4 · Khuyến · Admin audit và staging (#31)
 
-**Trạng thái bàn giao:** backend và frontend đã kiểm thử cục bộ trên nền `main@63d9226`. Bước triển khai đang chờ host, URL HTTPS và quyền vận hành do nhóm cấp. Thiết review PR; Khuyến và chủ từng module ghi kết quả chạy trên cùng một commit trước khi đóng [issue #31](https://github.com/Thiet-do-doc/Du_an_website/issues/31).
+**Trạng thái bàn giao:** commit chức năng `2ae1245` đã qua kiểm thử cục bộ. Nhóm đã cung cấp [URL staging](https://mylove.180-93-194-66.sslip.io/). Kiểm tra công khai thành công trên build đang phục vụ. Bước còn chờ là triển khai bản Tuần 4 qua kênh được nhóm cấp quyền và nghiệm thu A/B/C trên đúng commit với Thiết.
 
 ## API và màn hình quản trị
 
@@ -63,4 +63,16 @@ Kiểm thử cục bộ trên PostgreSQL 18.4 riêng, chạy migration từ DB t
 
 `docker compose config` đã kiểm tra cấu hình cục bộ: chỉ web publish lên loopback, API và PostgreSQL dùng mạng riêng, volume DB và health dependency đúng. Job CI `staging-compose` sẽ build image, migrate, kiểm tra HTTPS và đọc lại dữ liệu sau khi tạo lại container trên runner của PR.
 
-Khi có host, bổ sung vào PR: SHA từ `git rev-parse HEAD`, URL, ngày giờ chạy, tên người xác nhận từng dòng, kết quả PASS/FAIL, lỗi còn lại và người phụ trách. Đính kèm ảnh màn hình đã che email/ID hoặc kết quả smoke. Hiện còn chờ xác nhận HTTPS, WebSocket 101, dữ liệu sau restart, CI của PR và review trên bản triển khai chung.
+### Kiểm tra công khai ngày 05/11/2026, 16:06 giờ Việt Nam
+
+Lệnh đã chạy: `node scripts/staging-smoke.mjs https://mylove.180-93-194-66.sslip.io`.
+
+| Hạng mục | Kết quả trên build đang phục vụ |
+| --- | --- |
+| HTTPS, /healthz, API và PostgreSQL | PASS. TLS hợp lệ, /healthz trả ok, hai endpoint health trả 200. |
+| React và tải lại /admin | PASS. Trang chủ và /admin trả cùng HTML, trình duyệt có thể tải bundle JS. |
+| CSRF và admin ẩn danh | PASS. API cấp CSRF token với cookie Secure. GET /api/v1/admin/reports trả 401. |
+| Hub ẩn danh | POST /hubs/chat/negotiate?negotiateVersion=1 trả 401. Cần tài khoản thử để kiểm tra kết nối WebSocket 101. |
+| Phiên bản UI | Bundle đang phục vụ là `/assets/index-eNr0VQID.js`, chứa lời gọi `/api/v1/auth/admin-check` của màn hình cũ. Hai dấu hiệu của màn hình mới, `MessageEvidenceRead` và đường dẫn `/evidence`, đều vắng mặt. SHA backend trên host chưa được xác minh. |
+
+Sau khi người vận hành triển khai bản tuần 4, ghi SHA thực tế từ `git rev-parse HEAD`, chạy lại smoke, và bổ sung người xác nhận, PASS/FAIL cùng lỗi còn lại cho từng dòng A/B/C. Các mục chờ gồm quyền thành viên 403, audit và khóa/mở với tài khoản thật của môi trường thử, WebSocket 101, dữ liệu sau restart, CI và review PR.
