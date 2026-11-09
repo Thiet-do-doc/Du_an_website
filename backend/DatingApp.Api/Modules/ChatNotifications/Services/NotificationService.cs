@@ -10,6 +10,29 @@ namespace DatingApp.Api.Modules.ChatNotifications.Services;
 
 public sealed class NotificationService(AppDbContext db, IHubContext<ChatHub> hub)
 {
+    public void QueueSocial(Guid recipientId, Guid actorId, string type, Guid targetId, string text)
+    {
+        if (recipientId == actorId) return;
+        db.Notifications.Add(new AppNotification {
+            RecipientId = recipientId, ActorId = actorId, Type = type, TargetId = targetId,
+            Text = text, DedupeKey = $"{type}:{Guid.NewGuid():N}"
+        });
+    }
+
+    private IQueryable<AppNotification> Visible(IQueryable<AppNotification> query, Guid userId) =>
+        query.Where(n => n.RecipientId == userId && (n.ActorId == null ||
+            db.Users.Any(u => u.Id == n.ActorId && u.IsActive && u.EmailConfirmed) &&
+            !db.Blocks.Any(b => b.BlockerUserId == userId && b.BlockedUserId == n.ActorId ||
+                b.BlockedUserId == userId && b.BlockerUserId == n.ActorId)) &&
+            (n.Type != "friendPost" && n.Type != "postLike" && n.Type != "comment" && n.Type != "reply" ||
+                db.Set<DatingApp.Api.Modules.Posts.Entities.Post>().Any(p => p.Id == n.TargetId &&
+                    p.Author.IsActive && p.Author.EmailConfirmed &&
+                    !db.Blocks.Any(b => b.BlockerUserId == userId && b.BlockedUserId == p.AuthorId ||
+                        b.BlockedUserId == userId && b.BlockerUserId == p.AuthorId))));
+
+    public Task<int> UnreadCountAsync(Guid userId, CancellationToken ct) =>
+        Visible(db.Notifications.AsNoTracking(), userId).CountAsync(n => n.ReadAt == null, ct);
+
     /// <summary>Queue inside the message transaction. The caller persists it with the message.</summary>
     public AppNotification QueueNewMessage(Guid recipientId, Guid messageId, Guid conversationId)
     {
@@ -81,8 +104,7 @@ public sealed class NotificationService(AppDbContext db, IHubContext<ChatHub> hu
         if (cursor is not null && afterId is not null)
             throw new ChatDomainException(400, "Không dùng đồng thời cursor và afterId.");
 
-        IQueryable<AppNotification> query = db.Notifications.AsNoTracking()
-            .Where(x => x.RecipientId == userId);
+        IQueryable<AppNotification> query = Visible(db.Notifications.AsNoTracking(), userId);
 
         if (afterId is not null)
         {
@@ -91,7 +113,7 @@ public sealed class NotificationService(AppDbContext db, IHubContext<ChatHub> hu
             query = db.Notifications.FromSqlInterpolated(
                 $"SELECT * FROM \"Notifications\" WHERE \"RecipientId\" = {userId} AND (\"CreatedAt\", \"Id\") > ({anchor.CreatedAt}, {anchor.Id})")
                 .AsNoTracking();
-            var newer = await query.OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
+            var newer = await Visible(query, userId).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
                 .Take(pageSize + 1).ToListAsync(ct);
             var hasNewer = newer.Count > pageSize;
             var items = newer.Take(pageSize).ToList();
@@ -108,7 +130,7 @@ public sealed class NotificationService(AppDbContext db, IHubContext<ChatHub> hu
                 .AsNoTracking();
         }
 
-        var older = await query.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+        var older = await Visible(query, userId).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
             .Take(pageSize + 1).ToListAsync(ct);
         var hasMore = older.Count > pageSize;
         var pageItems = older.Take(pageSize).ToList();
@@ -120,7 +142,7 @@ public sealed class NotificationService(AppDbContext db, IHubContext<ChatHub> hu
 
     public async Task<NotificationDto> MarkReadAsync(Guid userId, Guid id, CancellationToken ct = default)
     {
-        var n = await db.Notifications.SingleOrDefaultAsync(x => x.Id == id && x.RecipientId == userId, ct);
+        var n = await Visible(db.Notifications, userId).SingleOrDefaultAsync(x => x.Id == id, ct);
         if (n is null) throw new ChatDomainException(404, "Không tìm thấy thông báo hoặc không có quyền.");
         n.ReadAt ??= DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);

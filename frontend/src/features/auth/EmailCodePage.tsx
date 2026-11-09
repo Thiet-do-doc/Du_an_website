@@ -35,7 +35,7 @@ export function EmailCodePage() {
     try {
       await verifyEmailCode(email, code);
       sessionStorage.removeItem(emailKey); sessionStorage.removeItem(resendKey);
-      finishSignIn();
+      finishSignIn('/profile');
     } catch (e) { setError(e instanceof ApiError ? e.message : 'Không thể xác nhận. Hãy thử lại.'); }
     finally { setBusy(false); }
   }

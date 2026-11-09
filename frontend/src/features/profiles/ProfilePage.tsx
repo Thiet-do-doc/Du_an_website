@@ -21,6 +21,7 @@ function ProfileEditor() {
       const [p, choices] = await Promise.all([getMyProfile(), getInterests()]);
       setProfile(p); setInterests(choices); setName(p.displayName); setBio(p.bio ?? ''); setCity(p.city ?? '');
       setGender(p.gender ?? ''); setDiscoverable(p.isDiscoverable); setSelected(p.interests.map(x => x.id));
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: p }));
     } catch { setError('Không tải được hồ sơ. Hãy kiểm tra kết nối và thử lại.'); }
     finally { setLoading(false); }
   }, []);
@@ -64,6 +65,8 @@ function ProfileEditor() {
     <div className="profile-heading"><div><p className="eyebrow">HỒ SƠ CỦA BẠN</p><h1>Hãy để câu chuyện của bạn bắt đầu.</h1>
       <p className="profile-lead">Hoàn thiện hồ sơ để mọi người hiểu thêm về bạn. Ngày sinh và email không hiển thị công khai.</p></div>
       {profile?.isComplete && <span className="profile-badge">Hồ sơ hoàn thiện</span>}</div>
+    {profile && !profile.isComplete && <p className="profile-notice" role="status">Chào mừng bạn! Hãy lưu tên hiển thị và chọn ít nhất một sở thích để bắt đầu sử dụng mylove.</p>}
+    {profile?.isComplete && <a className="btn btn-outline-dark" href="/">Tiếp tục đến trang chủ</a>}
     {error && <p className="profile-alert" role="alert">{error}</p>}{notice && <p className="profile-notice" role="status">{notice}</p>}
     <form className="profile-card" onSubmit={submit}>
       <h2>Giới thiệu</h2>

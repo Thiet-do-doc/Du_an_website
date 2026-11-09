@@ -21,6 +21,8 @@ internal static class AdminProvisioning
         {
             if (!await users.IsInRoleAsync(existing, "Admin"))
                 throw new InvalidOperationException($"Email {Email} đã thuộc về một tài khoản khác.");
+            await GrantRoleAsync(users, roles, existing);
+            await transaction.CommitAsync();
             Console.WriteLine($"Tài khoản Admin {Email} đã tồn tại.");
             return;
         }
@@ -52,5 +54,7 @@ internal static class AdminProvisioning
         var result = await users.AddToRoleAsync(user, "Admin");
         if (!result.Succeeded && !await users.IsInRoleAsync(user, "Admin"))
             throw new InvalidOperationException("Không cấp được vai trò Admin.");
+        if (await users.IsInRoleAsync(user, "User") && !(await users.RemoveFromRoleAsync(user, "User")).Succeeded)
+            throw new InvalidOperationException("Không gỡ được vai trò User của Admin.");
     }
 }

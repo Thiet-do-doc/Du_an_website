@@ -73,6 +73,28 @@ h2 { margin: 0; font-size: 15px; }
 
 }
 @scope (.tv4-demo) {
+  .layout { grid-template-columns: minmax(195px, 28%) minmax(0, 1fr); }
+  .chat-gifts { padding: 16px; border-top: 1px solid #efdee5; background: #fff8fb; }
+  .chat-gifts header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .chat-gifts header button { border: 0; background: transparent; padding: 8px; }
+  .chat-gifts p { font-size: 12px; color: #875e70; margin: 8px 0; }
+  .chat-gifts > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: 8px; }
+  .chat-gifts > div button { background: white; border: 1px solid #ecd5df; border-radius: 14px; padding: 8px; color: #71334b; }
+  .chat-gifts > div button:hover { border-color: #b33f69; background: #fff0f5; }
+  .chat-gifts svg { width: 70px; height: 70px; display: block; margin: auto; }
+  .chat-gifts span { font-size: 12px; display: block; }
+  .composer .gift-toggle { min-width: 42px; background: #f8e5ed; font-size: 22px; }
+  .chat-top { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .chat-top-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .chat-action, .chat-block { border: 1px solid #ecd5df; background: #fff; color: #71334b; border-radius: 9px; padding: 6px 11px; font-size: 12px; font-weight: 600; text-decoration: none; }
+  .chat-action:hover, .chat-block:hover { background: #fff0f5; border-color: #b33f69; }
+  @media (max-width: 720px) {
+    .layout { display: flex; flex-direction: column; }
+    .conversations { border-right: 0; border-bottom: 1px solid #efdee5; }
+    .messages { flex: none; height: 360px; min-height: 250px; }
+  }
+}
+@scope (.tv4-demo) {
 :scope { color:#412c37; background:transparent; font-family:'Segoe UI',Arial,sans-serif; }
 .shell { padding:0; } .eyebrow { color:#9b516b; } .app-header h1 { color:#412c37; font-size:34px; } .layout { border-color:#efdee5; box-shadow:0 12px 30px #a45b7310; } .messages { background:linear-gradient(160deg,#fffcfd,#fff2f7); } .mine .bubble { background:#b33f69; } .bubble { background:#f5e8ee; } .avatar { background:linear-gradient(135deg,#e8a1bb,#b34d76); } .person.selected { background:#fff0f6; border-color:#ebc0d1; } .person:hover { background:#fff6f9; } .person,.chat-top h2 { color:#412c37; } .composer button { background:#b33f69; } .composer input { background:#fffafd; border-color:#ead5df; } .section-heading span { color:#a43e65; background:#fbe6ee; } .notice.unread { background:#fff3f8; border-color:#f1d2df; } .notice button { color:#a43e65; } .conversations,.notifications,.chat-top { border-color:#f0e0e8; }
 }

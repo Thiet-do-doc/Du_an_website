@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Collections.Concurrent;
@@ -135,12 +136,19 @@ public sealed partial class AuthFlowTests
             Assert.True((await users.AddToRoleAsync(user, "Admin")).Succeeded);
         }
         Assert.Equal(HttpStatusCode.OK, (await browser.Get("admin-check", access)).StatusCode);
+        var adminMe = await (await browser.Get("me", access)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Admin", Assert.Single(adminMe.GetProperty("roles").EnumerateArray()).GetString());
+        var adminAccess = await Token(await browser.Post("login", new { account.Email, Password }));
+        var adminJwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(adminAccess);
+        Assert.Equal("Admin", Assert.Single(adminJwt.Claims, c => c.Type == ClaimTypes.Role || c.Type == "role").Value);
         using (var scope = app.Services.CreateScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             Assert.True((await users.RemoveFromRoleAsync((await users.FindByIdAsync(account.Id.ToString()))!, "Admin")).Succeeded);
         }
         Assert.Equal(HttpStatusCode.Forbidden, (await browser.Get("admin-check", access)).StatusCode);
+        var userMe = await (await browser.Get("me", access)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("User", Assert.Single(userMe.GetProperty("roles").EnumerateArray()).GetString());
         using (var scope = app.Services.CreateScope())
         {
             Assert.True(await scope.ServiceProvider.GetRequiredService<IAccountAccess>().SetActiveAsync(account.Id, false));

@@ -1,0 +1,14 @@
+.notification-page { max-width: 820px; margin: auto; }
+.notification-badge { background: #b33f69; color: white; border-radius: 20px; padding: 2px 6px; font-size: 10px; line-height: 1.4; }
+.notification-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0; }
+.notification-filters button { padding: 9px 16px; border: 1px solid #e5ccd5; border-radius: 24px; background: white; color: #71334b; }
+.notification-filters button[aria-pressed=true] { background: #71334b; color: white; }
+.notification-list { list-style: none; padding: 0; display: grid; gap: 10px; }
+.notification-list li { display: flex; align-items: center; gap: 16px; padding: 20px; border: 1px solid #efdee5; border-radius: 18px; background: white; }
+.notification-list li.unread { background: #fff0f5; }
+.notification-list li > div { flex: 1; min-width: 0; }
+.notification-list a { display: block; color: #412c37; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.notification-list time { display: block; color: #8a707c; font-size: 12px; margin-top: 5px; }
+.notification-list button { border: 0; background: none; color: #a3345c; padding: 6px 0 0; font-size: 12px; }
+.notification-symbol { display: grid; place-items: center; border-radius: 50%; background: #f3dce6; color: #a3345c; width: 44px; height: 44px; flex-shrink: 0; font-size: 24px; }
+.notification-dot { width: 8px; height: 8px; border-radius: 50%; background: #b33f69; flex-shrink: 0; }

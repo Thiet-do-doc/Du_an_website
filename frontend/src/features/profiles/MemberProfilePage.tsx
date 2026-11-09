@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError } from '../auth/api';
 import { likeProfile } from '../discovery-matching/api/discovery';
+import { blockUser } from '../safety-admin/api/blocks';
 import { getPublicProfile } from './api';
 import { PrivatePhoto } from './PrivatePhoto';
 import type { PublicProfile } from './types';
@@ -10,12 +11,14 @@ export default function MemberProfilePage({ userId }: { userId: string }) {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [blockedNotice, setBlockedNotice] = useState('');
   const [needsProfile, setNeedsProfile] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const reload = useCallback(() => setAttempt(n => n + 1), []);
   useEffect(() => {
     const controller = new AbortController();
     setError('');
+    setBlockedNotice('');
     getPublicProfile(userId, controller.signal)
       .then(p => { if (!controller.signal.aborted) setProfile(p); })
       .catch(e => {
@@ -51,6 +54,20 @@ export default function MemberProfilePage({ userId }: { userId: string }) {
     } finally { setBusy(false); }
   }
 
+  async function handleBlock() {
+    if (busy || !profile) return;
+    if (!window.confirm(`Chặn ${profile.displayName}? Hai bạn sẽ không thấy hồ sơ, bài viết hay nhắn tin cho nhau nữa.`)) return;
+    setBusy(true); setError('');
+    try {
+      await blockUser(profile.userId);
+      setBlockedNotice(`Đã chặn ${profile.displayName}. Bạn có thể bỏ chặn trong mục An toàn.`);
+      setProfile(null);
+      window.dispatchEvent(new Event('notifications-read'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không chặn được người dùng.');
+    } finally { setBusy(false); }
+  }
+
   const avatar = profile?.photos.find(p => p.isAvatar);
   const gallery = profile?.photos.filter(p => p.id !== avatar?.id) ?? [];
   return <section className="profile-page member-profile">
@@ -58,7 +75,9 @@ export default function MemberProfilePage({ userId }: { userId: string }) {
     {error && <p className="profile-alert" role="alert">{error} {needsProfile
       ? <a href="/profile">Hoàn thiện hồ sơ của bạn</a>
       : <button type="button" onClick={reload}>Thử lại</button>}</p>}
-    {!profile ? !error && <p role="status">Đang tải hồ sơ…</p> :
+    {blockedNotice && <div className="profile-notice" role="status"><p>{blockedNotice}</p>
+      <div className="member-safety"><a className="text-link" href="/">Về bảng tin</a><a className="text-link" href="/safety">Quản lý danh sách chặn</a></div></div>}
+    {!profile ? (!error && !blockedNotice && <p role="status">Đang tải hồ sơ…</p>) :
       <div className="ml-card">
         <header className="member-profile-head">
           {avatar ? <PrivatePhoto className="member-portrait" src={avatar.url} alt={'Ảnh đại diện của ' + profile.displayName} />
@@ -86,6 +105,10 @@ export default function MemberProfilePage({ userId }: { userId: string }) {
         {gallery.length > 0 && <section><h2>Ảnh hồ sơ</h2><div className="photo-grid">
           {gallery.map((p, i) => <div className="photo-item" key={p.id}><PrivatePhoto src={p.url} alt={'Ảnh hồ sơ ' + (i + 1)} /></div>)}
         </div></section>}
+        <div className="member-safety">
+          <button type="button" className="btn btn-outline-secondary" disabled={busy} onClick={() => void handleBlock()}>Chặn người dùng</button>
+          <a className="text-link" href={'/safety?user=' + encodeURIComponent(profile.userId)}>Báo cáo người dùng</a>
+        </div>
       </div>}
   </section>;
 }

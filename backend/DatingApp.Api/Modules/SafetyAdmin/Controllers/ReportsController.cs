@@ -16,6 +16,16 @@ namespace DatingApp.Api.Modules.SafetyAdmin.Controllers;
 [Route("api/v1/reports")]
 public sealed class ReportsController(AppDbContext db, UserManager<ApplicationUser> users, IChatReportTargetAccess chatAccess) : ControllerBase
 {
+    [HttpGet("mine")]
+    public async Task<IActionResult> Mine([FromQuery, System.ComponentModel.DataAnnotations.Range(1, 10000)] int page = 1, CancellationToken ct = default)
+    {
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var rows = await db.Reports.AsNoTracking().Where(r => r.ReporterUserId == actor)
+            .OrderByDescending(r => r.CreatedAtUtc).ThenByDescending(r => r.Id).Skip((page - 1) * 20).Take(21)
+            .Select(r => new { r.Id, r.TargetType, r.Reason, r.Description, r.Status, r.CreatedAtUtc }).ToListAsync(ct);
+        return Ok(new { items = rows.Take(20), hasMore = rows.Count > 20 });
+    }
+
     [HttpPost]
     public async Task<ActionResult<ReportResponse>> Create(CreateReportRequest request, CancellationToken cancellationToken)
     {

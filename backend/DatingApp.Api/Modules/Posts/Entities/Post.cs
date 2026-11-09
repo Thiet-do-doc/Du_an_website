@@ -40,6 +40,8 @@ public sealed class PostComment
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid PostId { get; set; }
     public Guid UserId { get; set; }
+    public Guid? ParentId { get; set; }
+    public ICollection<CommentReaction> Reactions { get; } = new List<CommentReaction>();
     public string Content { get; set; } = "";
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 }
@@ -55,6 +57,25 @@ public sealed class PostLikeConfiguration : IEntityTypeConfiguration<PostLike>
     }
 }
 
+public sealed class CommentReaction
+{
+    public Guid CommentId { get; set; }
+    public Guid UserId { get; set; }
+    public string Kind { get; set; } = "like";
+}
+
+public sealed class CommentReactionConfiguration : IEntityTypeConfiguration<CommentReaction>
+{
+    public void Configure(EntityTypeBuilder<CommentReaction> entity)
+    {
+        entity.ToTable("CommentReactions", t => t.HasCheckConstraint("CK_CommentReactions_Kind", "\"Kind\" IN ('like', 'haha', 'angry', 'sad')"));
+        entity.HasKey(x => new { x.CommentId, x.UserId });
+        entity.Property(x => x.Kind).HasMaxLength(12);
+        entity.HasOne<PostComment>().WithMany(x => x.Reactions).HasForeignKey(x => x.CommentId);
+        entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId);
+    }
+}
+
 public sealed class PostCommentConfiguration : IEntityTypeConfiguration<PostComment>
 {
     public void Configure(EntityTypeBuilder<PostComment> entity)
@@ -64,5 +85,6 @@ public sealed class PostCommentConfiguration : IEntityTypeConfiguration<PostComm
         entity.HasIndex(x => new { x.PostId, x.CreatedAtUtc, x.Id });
         entity.HasOne<Post>().WithMany(p => p.Comments).HasForeignKey(x => x.PostId);
         entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId);
+        entity.HasOne<PostComment>().WithMany().HasForeignKey(x => x.ParentId).OnDelete(DeleteBehavior.Cascade);
     }
 }

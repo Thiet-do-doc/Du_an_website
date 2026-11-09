@@ -30,3 +30,4 @@
 .member-connect, .received-likes { background: #fff5f8; border-radius: 1rem; padding: 1rem; margin: 1rem 0; }
 .received-likes ul { padding-left: 1.25rem; }
 .received-likes li + li { margin-top: .5rem; }
+.member-safety { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #f0dfe5; }

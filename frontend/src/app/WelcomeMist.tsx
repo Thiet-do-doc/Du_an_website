@@ -12,8 +12,9 @@ export function WelcomeMist() {
 }
 
 const loginWelcome = 'mylove.login-welcome';
-export function finishSignIn() {
+export function finishSignIn(destination?: string) {
   sessionStorage.setItem(loginWelcome, '1');
+  if (destination) { location.replace(destination); return; }
   const post = new URLSearchParams(location.search).get('post');
   if (location.pathname === '/profile' && new URLSearchParams(location.search).has('user')) {
     location.reload();

@@ -1,5 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { authenticatedFetch } from '../auth/api';
+import { blockUser } from '../safety-admin/api/blocks';
+import { CommentThread } from './CommentThread';
 import { PrivatePhoto } from '../profiles/PrivatePhoto';
 
 export type Post = {
@@ -7,18 +9,12 @@ export type Post = {
   hasPhoto: boolean; feeling: string | null; likeCount: number; isLiked: boolean; commentCount: number;
   canOpenAuthorProfile: boolean; authorAvatarId: string | null;
 };
-type Comment = { id: string; authorName: string; content: string; createdAtUtc: string };
-type CommentsPage = { items: Comment[]; hasMore: boolean };
 const date = (value: string) => new Date(value).toLocaleString('vi-VN', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
-export function PostCard({ post, onChange, onDelete, deleting }: {
-  post: Post; onChange: (post: Post) => void; onDelete: () => void; deleting: boolean;
+export function PostCard({ post, onChange, onDelete, onBlockAuthor, deleting }: {
+  post: Post; onChange: (post: Post) => void; onDelete: () => void; onBlockAuthor?: (authorId: string, authorName: string) => void; deleting: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [page, setPage] = useState(0);
-  const [more, setMore] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [open, setOpen] = useState(new URLSearchParams(location.search).get('comments') === '1');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [shareNotice, setShareNotice] = useState('');
@@ -35,25 +31,9 @@ export function PostCard({ post, onChange, onDelete, deleting }: {
     catch (e) { setError(e instanceof Error ? e.message : 'Chưa thực hiện được. Hãy thử lại.'); }
     finally { setBusy(false); }
   }
-  async function loadPage(next: number) {
-    const result = await authenticatedFetch<CommentsPage>(path + '/comments?page=' + next);
-    setComments(old => next === 1 ? result.items : Array.from(new Map([...old, ...result.items].map(c => [c.id, c])).values()));
-    setPage(next); setMore(result.hasMore);
-  }
   async function toggleLike() {
     await authenticatedFetch(path + '/like', { method: post.isLiked ? 'DELETE' : 'PUT' });
     onChange(await authenticatedFetch<Post>(path));
-  }
-  async function submitComment(event: FormEvent) {
-    event.preventDefault();
-    if (!draft.trim() || busy) return;
-    await run(async () => {
-      await authenticatedFetch(path + '/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: draft.trim() }) });
-      setDraft('');
-      await loadPage(1);
-      onChange(await authenticatedFetch<Post>(path));
-    });
   }
   async function share() {
     setShareNotice(''); setCopyLink(false);
@@ -63,6 +43,12 @@ export function PostCard({ post, onChange, onDelete, deleting }: {
     }
     try { await navigator.clipboard.writeText(link); setShareNotice('Đã sao chép liên kết bài viết.'); }
     catch { setCopyLink(true); }
+  }
+  async function blockAuthor() {
+    if (!window.confirm(`Chặn ${post.authorName}? Bài viết, bình luận và hồ sơ của người này sẽ bị ẩn khỏi bạn.`)) return;
+    await blockUser(post.authorId);
+    window.dispatchEvent(new Event('notifications-read'));
+    onBlockAuthor?.(post.authorId, post.authorName);
   }
   return <article className="ml-card post-card">
     <header className="post-top">{post.canOpenAuthorProfile
@@ -79,21 +65,17 @@ export function PostCard({ post, onChange, onDelete, deleting }: {
       <button type="button" aria-pressed={post.isLiked} disabled={busy} onClick={() => void run(toggleLike)}>
         {post.isLiked ? '♥ Đã thích' : '♡ Thích'} · {post.likeCount}</button>
       <button type="button" aria-expanded={open} disabled={busy} onClick={() => {
-        setOpen(!open); if (!open) void run(() => loadPage(1));
+        setOpen(!open);
       }}>Bình luận · {post.commentCount}</button>
       <button type="button" onClick={() => void share()}>Chia sẻ ↗</button>
     </div>
     {shareNotice && <p role="status">{shareNotice}</p>}
     {copyLink && <label>Liên kết bài viết<input readOnly value={link} onFocus={e => e.target.select()} /></label>}
-    {open && <section className="post-comments" aria-label="Bình luận">
-      <form onSubmit={submitComment}><label>Viết bình luận<input maxLength={1000} value={draft} onChange={e => setDraft(e.target.value)} /></label>
-        <button className="btn btn-dark" disabled={busy || !draft.trim()}>Gửi</button></form>
-      {busy && <small role="status">Đang xử lý…</small>}
-      {!busy && !error && !comments.length && <p>Chưa có bình luận.</p>}
-      {comments.map(c => <div key={c.id}><strong>{c.authorName}</strong> <time dateTime={c.createdAtUtc}>{date(c.createdAtUtc)}</time><p>{c.content}</p></div>)}
-      {more && <button type="button" disabled={busy} onClick={() => void run(() => loadPage(page + 1))}>Xem bình luận trước</button>}
-    </section>}
+    {open && <CommentThread postId={post.id} onChange={async () => { onChange(await authenticatedFetch<Post>(path)); }} />}
     {error && <p role="alert" className="text-danger">{error}</p>}
-    {!post.isMine && <a className="text-link" href={'/safety?user=' + post.authorId}>An toàn &amp; chặn</a>}
+    {!post.isMine && <div className="post-safety">
+      <a className="text-link" href={'/safety?user=' + encodeURIComponent(post.authorId)}>Báo cáo người dùng</a>
+      <button type="button" className="post-block" disabled={busy} onClick={() => void run(blockAuthor)}>Chặn người dùng</button>
+    </div>}
   </article>;
 }

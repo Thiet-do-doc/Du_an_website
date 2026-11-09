@@ -29,9 +29,10 @@ export type ConversationPage = {
 };
 export type ChatNotification = {
   id: string;
-  type: 'match' | 'newMessage';
+  type: 'match' | 'newMessage' | 'profileLike' | 'friendPost' | 'postLike' | 'comment' | 'reply';
   targetId: string;
-  conversationId: string;
+  conversationId: string | null;
+  text?: string | null;
   createdAt: string;
   readAt: string | null;
 };

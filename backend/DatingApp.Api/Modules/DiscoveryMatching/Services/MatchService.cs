@@ -3,6 +3,7 @@ using DatingApp.Api.Modules.DiscoveryMatching.DTOs;
 using DatingApp.Api.Modules.DiscoveryMatching.Entities;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using DatingApp.Api.Modules.ChatNotifications.Entities;
 
 namespace DatingApp.Api.Modules.DiscoveryMatching.Services;
 
@@ -32,7 +33,13 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
                 }
 
                 if (!await db.UserLikes.AnyAsync(x => x.FromUserId == fromUserId && x.ToUserId == toUserId, cancellationToken))
+                {
                     db.UserLikes.Add(new UserLike { FromUserId = fromUserId, ToUserId = toUserId, CreatedAt = clock.GetUtcNow().UtcDateTime });
+                    var name = await db.Profiles.Where(p => p.UserId == fromUserId).Select(p => p.DisplayName).SingleOrDefaultAsync(cancellationToken) ?? "Một thành viên";
+                    db.Notifications.Add(new AppNotification { RecipientId = toUserId, ActorId = fromUserId,
+                        Type = "profileLike", TargetId = fromUserId, Text = name + " đã thích bạn.",
+                        DedupeKey = $"profileLike:{Guid.NewGuid():N}" });
+                }
                 await db.Passes.Where(x => x.FromUserId == fromUserId && x.ToUserId == toUserId).ExecuteDeleteAsync(cancellationToken);
 
                 var mutualLike = await db.UserLikes.AnyAsync(x => x.FromUserId == toUserId && x.ToUserId == fromUserId, cancellationToken);

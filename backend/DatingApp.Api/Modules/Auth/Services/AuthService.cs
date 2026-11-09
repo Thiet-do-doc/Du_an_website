@@ -205,8 +205,7 @@ public sealed class AuthService(UserManager<ApplicationUser> users, AppDbContext
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), new("sid", sessionId.ToString()),
             new("security_stamp", user.SecurityStamp!)
         };
-        claims.Add(new Claim(ClaimTypes.Role, "User"));
-        foreach (var role in await users.GetRolesAsync(user)) claims.Add(new Claim(ClaimTypes.Role, role));
+        claims.Add(new Claim(ClaimTypes.Role, await users.IsInRoleAsync(user, "Admin") ? "Admin" : "User"));
         var token = new JwtSecurityToken(jwt.Issuer, jwt.Audience, claims, expires: expiresAt,
             signingCredentials: new SigningCredentials(jwt.SigningKey, SecurityAlgorithms.HmacSha256));
         return new AuthSession(new LoginResponse { Token = new JwtSecurityTokenHandler().WriteToken(token),

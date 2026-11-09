@@ -13,9 +13,20 @@ public sealed class BlocksController(AppDbContext db, ICurrentUser currentUser) 
     public async Task<IActionResult> List(CancellationToken cancellationToken)
     {
         if (currentUser.UserId is not Guid actorId) return Unauthorized();
-        return Ok(await db.Blocks.AsNoTracking().Where(x => x.BlockerUserId == actorId)
-            .OrderByDescending(x => x.CreatedAt).Select(x => new { userId = x.BlockedUserId, blockedAt = x.CreatedAt })
-            .ToListAsync(cancellationToken));
+        var rows = await (
+            from b in db.Blocks.AsNoTracking()
+            join p in db.Profiles.AsNoTracking() on b.BlockedUserId equals p.UserId into ps
+            from profile in ps.DefaultIfEmpty()
+            where b.BlockerUserId == actorId
+            orderby b.CreatedAt descending
+            select new
+            {
+                userId = b.BlockedUserId,
+                blockedAt = b.CreatedAt,
+                displayName = profile != null ? profile.DisplayName : null
+            })
+            .ToListAsync(cancellationToken);
+        return Ok(rows);
     }
     [HttpPost("{targetUserId}")]
     public async Task<IActionResult> Block(Guid targetUserId, CancellationToken cancellationToken)

@@ -87,9 +87,13 @@ export default function FeedPage() {
     <div className="feed-title"><h2>Bảng tin</h2><span>Mới nhất</span></div>
     {posts.map(post => <PostCard key={post.id} post={post} deleting={busy}
       onChange={next => setPosts(list => list.map(p => p.id === next.id ? next : p))}
+      onBlockAuthor={(authorId, authorName) => {
+        setPosts(old => old.filter(p => p.authorId !== authorId));
+        setNotice(`Đã chặn ${authorName}. Bạn có thể bỏ chặn trong mục An toàn.`);
+      }}
       onDelete={() => void remove(post.id)} />)}
     {loading && <p role="status">Đang tải những câu chuyện mới…</p>}
     {!loading && !error && !posts.length && <div className="ml-card feed-empty"><span aria-hidden="true">♡</span><h2>Một trang mới, một câu chuyện mới.</h2><p>Chưa có bài viết nào để hiển thị. Chia sẻ điều đầu tiên của bạn nhé!</p></div>}
     {hasMore && <button className="btn btn-outline-secondary feed-load" disabled={loading} onClick={() => setPage(p => p + 1)}>Xem thêm bài viết</button>}
-  </section><aside className="feed-sidebar"><div className="ml-card"><div className="side-art" aria-hidden="true">✦</div><h2>Để mọi người hiểu bạn hơn</h2><p>Một tấm ảnh, đôi dòng giới thiệu và những điều bạn yêu thích.</p><a className="text-link" href="/profile">Hoàn thiện hồ sơ ↗</a></div><div className="ml-card"><p className="ml-kicker">CÓ THỂ BẠN SẼ GẶP</p><h2>Một người cùng tần số</h2><p>Ghé Khám phá và bắt đầu bằng một lời thích.</p><a className="text-link" href="/discover">Khám phá ngay ↗</a></div><div className="ml-card"><span className="soon-pill">Quà ảo miễn phí</span><h2>Trao một chút yêu thương</h2><p>Chọn một món quà nhỏ gửi đến người bạn đã ghép đôi.</p><a className="text-link" href="/gifts">Ghé góc quà tặng ↗</a></div></aside></div>;
+  </section><aside className="feed-sidebar"><div className="ml-card"><div className="side-art" aria-hidden="true">✦</div><h2>Để mọi người hiểu bạn hơn</h2><p>Một tấm ảnh, đôi dòng giới thiệu và những điều bạn yêu thích.</p><a className="text-link" href="/profile">Hoàn thiện hồ sơ ↗</a></div><div className="ml-card"><p className="ml-kicker">CÓ THỂ BẠN SẼ GẶP</p><h2>Một người cùng tần số</h2><p>Ghé Khám phá và bắt đầu bằng một lời thích.</p><a className="text-link" href="/discover">Khám phá ngay ↗</a></div><div className="ml-card"><span className="soon-pill">Quà ảo miễn phí</span><h2>Trao một chút yêu thương</h2><p>Mở hội thoại và chọn nút quà tặng bên cạnh ô nhập tin nhắn.</p><a className="text-link" href="/chat">Tặng quà trong trò chuyện ↗</a></div></aside></div>;
 }

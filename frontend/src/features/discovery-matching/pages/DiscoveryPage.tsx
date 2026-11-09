@@ -1,7 +1,8 @@
 import { PhotoBackground } from '../../profiles/PrivatePhoto';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getDiscover, getMatches, getReceivedLikes, likeProfile, passProfile, unmatch, type ReceivedLike } from '../api/discovery';
 import { getInterests } from '../../profiles/api';
+import { blockUser } from '../../safety-admin/api/blocks';
 import type { Interest } from '../../profiles/types';
 import type { DiscoveryFilters, DiscoveryProfile, MatchSummary } from '../types/discovery';
 
@@ -31,8 +32,10 @@ export default function DiscoveryPage() {
   const [activeTab, setActiveTab] = useState<'discover' | 'matches'>('discover');
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -72,9 +75,20 @@ export default function DiscoveryPage() {
   const connectionCount = connectionsLoading || connectionsError ? null : received.length + matches.length;
   const today = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 
+  useEffect(() => { setMenuOpen(false); }, [profile?.id]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOutside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false); };
+    const closeEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeEscape);
+    return () => { document.removeEventListener('pointerdown', closeOutside); document.removeEventListener('keydown', closeEscape); };
+  }, [menuOpen]);
+
   async function advance(action: 'like' | 'pass') {
     if (!profile || acting) return;
     setActing(true);
+    setMenuOpen(false);
     setError('');
     try {
       if (action === 'like') {
@@ -90,6 +104,28 @@ export default function DiscoveryPage() {
       if (action === 'like') getMatches().then(setMatches).catch(() => undefined);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không hoàn tất được thao tác.');
+    } finally { setActing(false); }
+  }
+
+  async function blockProfileCard(target: DiscoveryProfile) {
+    if (acting) return;
+    setMenuOpen(false);
+    if (!window.confirm(`Chặn ${target.name}? Hai bạn sẽ không thấy hồ sơ, bài viết hay nhắn tin cho nhau nữa.`)) return;
+    setActing(true);
+    setError('');
+    try {
+      await blockUser(target.id);
+      setNotice(`Đã chặn ${target.name}. Bạn có thể bỏ chặn trong mục An toàn.`);
+      window.dispatchEvent(new Event('notifications-read'));
+      if (index + 1 < profiles.length) setIndex(index + 1);
+      else if (hasMore) setPage(current => current + 1);
+      else setIndex(profiles.length);
+      Promise.all([getMatches(), getReceivedLikes()]).then(([connections, likes]) => {
+        setMatches(connections);
+        setReceived(likes);
+      }).catch(() => undefined);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Không chặn được hồ sơ.');
     } finally { setActing(false); }
   }
 
@@ -141,7 +177,16 @@ export default function DiscoveryPage() {
         {loading && !profile ? <div className="empty-state" role="status"><DotOrbit /><h2>Đang tải hồ sơ…</h2></div> : profile ? <div className="profile-stage" aria-live="polite">
           <article className="person-card">
             <PhotoBackground className="person-photo" photoUrl={profile.photoUrl} role="img" aria-label={`Ảnh hồ sơ ${profile.name}`}>
-              <div className="photo-topline"><span className="verified">✓ Hồ sơ phù hợp</span><button className="more-button" onClick={() => { location.href = `/safety?user=${profile.id}`; }} aria-label="Chặn hoặc báo cáo hồ sơ">···</button></div>
+              <div className="photo-topline"><span className="verified">✓ Hồ sơ phù hợp</span>
+                <div className="photo-menu" ref={menuRef}>
+                  <button type="button" className="more-button" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen(o => !o)} aria-label="Chặn hoặc báo cáo hồ sơ">···</button>
+                  {menuOpen && <div className="more-menu" role="menu">
+                    <a role="menuitem" href={'/profile?user=' + encodeURIComponent(profile.id)} onClick={() => setMenuOpen(false)}>Xem hồ sơ</a>
+                    <button type="button" role="menuitem" disabled={acting} onClick={() => void blockProfileCard(profile)}>Chặn người này</button>
+                    <a role="menuitem" href={'/safety?user=' + encodeURIComponent(profile.id)} onClick={() => setMenuOpen(false)}>Báo cáo hồ sơ</a>
+                  </div>}
+                </div>
+              </div>
               <div className="photo-gradient" />
               <div className="person-caption">{profile.distanceKm != null && <span className="distance-tag">⌖ {profile.distanceKm} km</span>}<h2>{profile.name}<span>, {profile.age}</span></h2><p>{profile.occupation} <i>·</i> {profile.city}</p></div>
               <div className="photo-dots"><i className="on"/><i/><i/></div>
