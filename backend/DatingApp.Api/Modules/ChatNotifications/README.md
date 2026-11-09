@@ -1,18 +1,18 @@
 # ChatNotifications
+
 - Chủ trì: **TV4**. Dự phòng: **TV5**.
-- Phạm vi: SignalR, lịch sử chat, chống gửi trùng, reconnect và thông báo.
-- Bảng dự kiến: Conversations, Messages, Notifications.
-- Frontend tương ứng: `frontend/src/features/chat-notifications/`.
+- Phạm vi: hội thoại theo match thật, lịch sử tin nhắn, SignalR, chống gửi lặp và thông báo.
+- Frontend: `frontend/src/features/chat-notifications/`.
 
-Đây là chỗ phát triển tiếp, chưa có endpoint nghiệp vụ.
+## Tích hợp với Matching và Safety
 
-## Đầu việc đầu tiên
-1. Chốt request/response DTO và quy tắc quyền với thành viên liên quan.
-2. Tạo entity, cấu hình EF Core và migration có review khi đã chốt schema.
-3. Xây service xử lý nghiệp vụ; controller chỉ nhận, kiểm tra và trả HTTP.
-4. Nối giao diện React với API thật, có loading/error/empty.
-5. Thêm kiểm thử sai quyền và quy tắc quan trọng; gửi PR cho người khác review.
+- `MatchChatBridge` triển khai `IMatchConversationBridge` của TV3. `EnsureConversationAsync` dùng chung `AppDbContext`/transaction của `MatchService`, tạo một conversation cho mỗi match và trả lại conversation đã có khi retry. Notification và sự kiện `MatchCreated` chỉ phát sau khi match/conversation đã commit.
+- Unique index `Conversations.MatchId` ngăn conversation trùng. Danh sách conversation/match đọc dữ liệu database thật; client lấy lại danh sách để đồng bộ nếu lỡ sự kiện realtime.
+- `ChatPermissions` xác minh thành viên, cặp participant, trạng thái tài khoản, match và block ở cả hai chiều. Unmatch giữ conversation/tin nhắn để đọc lịch sử nhưng từ chối gửi tin mới; block ẩn và từ chối truy cập chat. Quyền được kiểm tra lại ngay trước khi lưu tin.
+- SignalR và HTTP dùng chung quy tắc quyền. Không dựa vào trạng thái UI để quyết định quyền gửi.
 
-Không tạo bảng hoặc API trùng với module khác. Không phát triển trước Auth
-bằng cách cho phép mọi người thao tác dữ liệu. Trao đổi API qua `Shared/Contracts`
-và service nếu cần thay đổi dữ liệu thuộc module khác.
+## API và kiểm thử
+
+- `GET /api/v1/conversations`, `GET /api/v1/conversations/{id}/messages`, API gửi tin qua SignalR và các route notifications yêu cầu tài khoản xác thực.
+- Test nghiệp vụ nằm trong `TV4ChatRulesTests.cs`; `IntegratedModuleTests.cs` kiểm tra tích hợp trên PostgreSQL thật, gồm match, conversation, block, unmatch và quyền chat.
+- Cần cấu hình `AUTH_TEST_CONNECTION` trỏ đến database test đã áp dụng migrations để chạy test tích hợp.

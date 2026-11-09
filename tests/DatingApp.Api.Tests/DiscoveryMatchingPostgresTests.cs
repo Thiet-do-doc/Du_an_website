@@ -40,10 +40,13 @@ public sealed class DiscoveryMatchingPostgresTests
 
         try
         {
-            var first = await Like(userIds[0], userIds[1]);
-            var repeat = await Like(userIds[0], userIds[1]);
-            Assert.False(first.IsMatch);
-            Assert.False(repeat.IsMatch);
+            var retries = await Task.WhenAll(Enumerable.Range(0, 8)
+                .Select(_ => Like(userIds[0], userIds[1])));
+            Assert.All(retries, result => Assert.False(result.IsMatch));
+            await using (var likesDb = new AppDbContext(options))
+                Assert.Equal(1, await likesDb.UserLikes.CountAsync(x =>
+                    x.FromUserId == userIds[0] && x.ToUserId == userIds[1]));
+
             var reciprocal = await Like(userIds[1], userIds[0]);
             Assert.True(reciprocal.IsMatch);
 
