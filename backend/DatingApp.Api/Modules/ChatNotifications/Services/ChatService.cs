@@ -91,8 +91,29 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
         return new MessagesPage(pageItems.Select(MessageDto.From).ToArray(), next, null);
     }
 
-    public async Task<SendResult> SendMessageAsync(Guid conversationId, Guid senderId,
-        string? content, Guid clientMessageId, CancellationToken ct = default)
+    public Task<SendResult> SendMessageAsync(Guid conversationId, Guid senderId,
+        string? content, Guid clientMessageId, CancellationToken ct = default) =>
+        SaveMessageAsync(conversationId, senderId, content, null, clientMessageId, ct);
+
+    public Task<SendResult> SendGiftAsync(Guid conversationId, Guid senderId, string code,
+        Guid clientMessageId, CancellationToken ct = default)
+    {
+        var gift = GiftCatalog.Items.FirstOrDefault(x => x.Code == code)
+            ?? throw new ChatDomainException(400, "Món quà này không có trong bộ sưu tập.");
+        return SaveMessageAsync(conversationId, senderId, gift.Name, gift.Code, clientMessageId, ct);
+    }
+
+    public async Task<IReadOnlyList<MessageDto>> RecentGiftsAsync(Guid conversationId, Guid userId, CancellationToken ct)
+    {
+        if (!(await permissions.GetAccessAsync(conversationId, userId, ct)).CanRead)
+            throw new ChatDomainException(404, "Không tìm thấy hội thoại hoặc không có quyền.");
+        return await db.Messages.AsNoTracking().Where(x => x.ConversationId == conversationId && x.GiftCode != null)
+            .OrderByDescending(x => x.SentAt).ThenByDescending(x => x.Id).Take(30)
+            .Select(x => MessageDto.From(x)).ToListAsync(ct);
+    }
+
+    private async Task<SendResult> SaveMessageAsync(Guid conversationId, Guid senderId,
+        string? content, string? giftCode, Guid clientMessageId, CancellationToken ct)
     {
         content = MessageRules.Validate(content, clientMessageId);
         var access = await permissions.GetAccessAsync(conversationId, senderId, ct);
@@ -104,7 +125,7 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
             .SingleOrDefaultAsync(x => x.SenderId == senderId && x.ClientMessageId == clientMessageId, ct);
         if (existing is not null)
         {
-            EnsureSamePayload(existing, conversationId, content);
+            EnsureSamePayload(existing, conversationId, content, giftCode);
             var oldNotification = await notifications.EnsureNewMessageAsync(
                 access.PartnerId, existing.Id, conversationId, ct);
             return new SendResult(MessageDto.From(existing), false, access.PartnerId,
@@ -124,7 +145,8 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
                 ConversationId = conversationId,
                 SenderId = senderId,
                 ClientMessageId = clientMessageId,
-                Content = content
+                Content = content,
+                GiftCode = giftCode
             };
             db.Messages.Add(message);
             var notice = notifications.QueueNewMessage(access.PartnerId, message.Id, conversationId);
@@ -140,7 +162,7 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
             var duplicate = await db.Messages.AsNoTracking().SingleOrDefaultAsync(x =>
                 x.SenderId == senderId && x.ClientMessageId == clientMessageId, ct);
             if (duplicate is null) throw new ChatDomainException(409, "Xung đột dữ liệu; hãy thử lại.");
-            EnsureSamePayload(duplicate, conversationId, content);
+            EnsureSamePayload(duplicate, conversationId, content, giftCode);
             var notice = await notifications.EnsureNewMessageAsync(access.PartnerId, duplicate.Id, conversationId, ct);
             return new SendResult(MessageDto.From(duplicate), false, access.PartnerId,
                 NotificationDto.From(notice));
@@ -153,9 +175,9 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
         }
     }
 
-    private static void EnsureSamePayload(ChatMessage message, Guid conversationId, string content)
+    private static void EnsureSamePayload(ChatMessage message, Guid conversationId, string content, string? giftCode)
     {
-        if (message.ConversationId != conversationId || !string.Equals(message.Content, content, StringComparison.Ordinal))
+        if (message.ConversationId != conversationId || message.GiftCode != giftCode || !string.Equals(message.Content, content, StringComparison.Ordinal))
             throw new ChatDomainException(409, "clientMessageId đã được dùng với hội thoại hoặc nội dung khác.");
     }
 

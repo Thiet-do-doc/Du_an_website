@@ -39,39 +39,34 @@ public sealed partial class AuthFlowTests
         var photoPath = $"photos/{photoId}/content";
         Assert.Equal(HttpStatusCode.OK, (await b.GetApi(photoPath, bt)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await b.GetApi(photoPath, "")).StatusCode);
+        var createdPost = await a.WriteApi(HttpMethod.Post, "posts", new { content = "Author profile link" }, at);
+        var postId = (await createdPost.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var author = await (await b.GetApi($"posts/{postId}", bt)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(author.GetProperty("canOpenAuthorProfile").GetBoolean());
+        Assert.Equal(photoId, author.GetProperty("authorAvatarId").GetGuid());
 
         var page1 = await (await a.GetApi($"discover?city={city}&pageSize=1&page=1", at)).Content.ReadFromJsonAsync<JsonElement>();
         var page2 = await (await a.GetApi($"discover?city={city}&pageSize=1&page=2", at)).Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(page1.GetProperty("hasMore").GetBoolean());
         Assert.Single(page2.GetProperty("items").EnumerateArray());
         Assert.NotEqual(page1.GetProperty("items")[0].GetProperty("userId").GetGuid(), page2.GetProperty("items")[0].GetProperty("userId").GetGuid());
-
-        Assert.Equal(HttpStatusCode.NoContent, (await a.WriteApi(HttpMethod.Post, $"blocks/{outsider.Id}", new { }, at)).StatusCode);
-        var afterBlock = await (await a.GetApi($"discover?city={city}&pageSize=20", at)).Content.ReadFromJsonAsync<JsonElement>();
-        var visibleIds = afterBlock.GetProperty("items").EnumerateArray()
-            .Select(x => x.GetProperty("userId").GetGuid()).ToArray();
-        Assert.Contains(bob.Id, visibleIds);
-        Assert.DoesNotContain(outsider.Id, visibleIds);
-        Assert.Equal(HttpStatusCode.NoContent, (await a.WriteApi(HttpMethod.Delete, $"blocks/{outsider.Id}", null, at)).StatusCode);
-
-        var likeResponses = await Task.WhenAll(
-            a.WriteApi(HttpMethod.Post, $"user-likes/{bob.Id}", new { }, at),
-            b.WriteApi(HttpMethod.Post, $"user-likes/{alice.Id}", new { }, bt));
-        Assert.All(likeResponses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
-        var likePayloads = await Task.WhenAll(likeResponses.Select(x => x.Content.ReadFromJsonAsync<JsonElement>()));
-        var match = likePayloads.Single(x => x.GetProperty("isMatch").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, (await a.WriteApi(HttpMethod.Post, $"user-likes/{bob.Id}", new { }, at)).StatusCode);
+        async Task<JsonElement> Connection(Browser viewer, Guid target, string token) =>
+            (await (await viewer.GetApi($"profiles/{target}", token)).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("connection");
+        Assert.Equal("sent", (await Connection(a, bob.Id, at)).GetProperty("state").GetString());
+        Assert.Equal("received", (await Connection(b, alice.Id, bt)).GetProperty("state").GetString());
+        var incoming = await (await b.GetApi("user-likes/received", bt)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(alice.Id, Assert.Single(incoming.EnumerateArray()).GetProperty("userId").GetGuid());
+        var mutual = await b.WriteApi(HttpMethod.Post, $"user-likes/{alice.Id}", new { }, bt);
+        Assert.Equal(HttpStatusCode.OK, mutual.StatusCode);
+        var match = await mutual.Content.ReadFromJsonAsync<JsonElement>();
         var conversationId = match.GetProperty("conversationId").GetGuid();
         var matchId = match.GetProperty("matchId").GetGuid();
         Assert.NotEqual(Guid.Empty, conversationId);
-        using (var scope = app.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            Assert.Equal(1, await db.Matches.CountAsync(x => x.Id == matchId));
-            Assert.Equal(1, await db.Conversations.CountAsync(x => x.MatchId == matchId));
-        }
-        var matchList = await (await a.GetApi("matches", at)).Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Single(matchList.EnumerateArray());
-        Assert.Equal(conversationId, matchList[0].GetProperty("conversationId").GetGuid());
+        var connection = await Connection(a, bob.Id, at);
+        Assert.Equal("matched", connection.GetProperty("state").GetString());
+        Assert.Equal(conversationId, connection.GetProperty("conversationId").GetGuid());
+        Assert.Empty((await (await b.GetApi("user-likes/received", bt)).Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray());
         var conversations = await (await a.GetApi("conversations", at)).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("Bob", conversations.GetProperty("items")[0].GetProperty("partnerName").GetString());
         Guid messageId;
@@ -83,11 +78,31 @@ public sealed partial class AuthFlowTests
             var replay = await chat.SendMessageAsync(conversationId, alice.Id, "Hello from integrated modules", clientId);
             messageId = sent.Message.Id;
             Assert.Equal(messageId, replay.Message.Id); Assert.False(replay.IsNew);
+            var giftId = Guid.NewGuid();
+            var gift = await chat.SendGiftAsync(conversationId, alice.Id, "tulip", giftId);
+            Assert.True(gift.IsNew);
+            Assert.NotNull(gift.Notification);
+            Assert.Equal("tulip", gift.Message.GiftCode);
+            Assert.Equal(gift.Message.Id, (await chat.SendGiftAsync(conversationId, alice.Id, "tulip", giftId)).Message.Id);
+            Assert.Equal(409, (await Assert.ThrowsAsync<ChatDomainException>(() =>
+                chat.SendMessageAsync(conversationId, alice.Id, gift.Message.Content, giftId))).StatusCode);
+            Assert.Equal(400, (await Assert.ThrowsAsync<ChatDomainException>(() =>
+                chat.SendGiftAsync(conversationId, alice.Id, "unknown", Guid.NewGuid()))).StatusCode);
         }
+        var gifts = await (await b.GetApi($"conversations/{conversationId}/gifts", bt)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("tulip", Assert.Single(gifts.EnumerateArray()).GetProperty("giftCode").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetApi($"conversations/{conversationId}/gifts", ct)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await b.GetApi($"conversations/{conversationId}/messages", bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetApi($"conversations/{conversationId}/messages", ct)).StatusCode);
         var report = new { targetType = "Message", targetId = messageId, reason = "Test report", description = "Integration test only" };
-        Assert.Equal(HttpStatusCode.Created, (await b.WriteApi(HttpMethod.Post, "reports", report, bt)).StatusCode);
+        var submitted = await b.WriteApi(HttpMethod.Post, "reports", report, bt);
+        Assert.Equal(HttpStatusCode.Created, submitted.StatusCode);
+        var reportId = (await submitted.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var reviewUrl = $"admin/reports/{reportId}";
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.GetApi(reviewUrl, bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.GetApi(reviewUrl + "/actions", bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.WriteApi(HttpMethod.Post, reviewUrl + "/evidence", null, bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.WriteApi(HttpMethod.Patch, reviewUrl, new { status = "Actioned", notes = "Test review" }, bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await c.WriteApi(HttpMethod.Post, "reports", report, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await a.WriteApi(HttpMethod.Post, "reports", report, at)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await a.GetApi("admin/reports", at)).StatusCode);
@@ -98,25 +113,21 @@ public sealed partial class AuthFlowTests
         Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"profiles/{bob.Id}", at)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await a.GetApi(photoPath, at)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"conversations/{conversationId}/messages", at)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"conversations/{conversationId}/gifts", at)).StatusCode);
+        using (var scope = app.Services.CreateScope())
+            Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() => scope.ServiceProvider
+                .GetRequiredService<ChatService>().SendGiftAsync(conversationId, alice.Id, "bear", Guid.NewGuid()))).StatusCode);
         Assert.Empty((await (await a.GetApi("matches", at)).Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray());
         using (var scope = app.Services.CreateScope())
             Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() => scope.ServiceProvider
                 .GetRequiredService<ChatService>().SendMessageAsync(conversationId, alice.Id, "blocked", Guid.NewGuid()))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await b.WriteApi(HttpMethod.Post, "reports", report, bt)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await a.WriteApi(HttpMethod.Delete, $"matches/{matchId}", null, at)).StatusCode);
-        Assert.Empty((await (await a.GetApi("matches", at)).Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray());
-        Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"conversations/{conversationId}/messages", at)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await b.WriteApi(HttpMethod.Delete, $"blocks/{alice.Id}", null, bt)).StatusCode);
-        Assert.Empty((await (await a.GetApi("matches", at)).Content.ReadFromJsonAsync<JsonElement>()).EnumerateArray());
-        Assert.Equal(HttpStatusCode.OK, (await a.GetApi($"conversations/{conversationId}/messages", at)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await a.WriteApi(HttpMethod.Delete, $"matches/{matchId}", null, at)).StatusCode);
+        Assert.Equal("unmatched", (await Connection(a, bob.Id, at)).GetProperty("state").GetString());
         using (var scope = app.Services.CreateScope())
-        {
-            var chat = scope.ServiceProvider.GetRequiredService<ChatService>();
-            Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() =>
-                chat.SendMessageAsync(conversationId, alice.Id, "unmatched by Alice", Guid.NewGuid()))).StatusCode);
-            Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() =>
-                chat.SendMessageAsync(conversationId, bob.Id, "unmatched by Bob", Guid.NewGuid()))).StatusCode);
-        }
+            Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() => scope.ServiceProvider
+                .GetRequiredService<ChatService>().SendMessageAsync(conversationId, alice.Id, "unmatched", Guid.NewGuid()))).StatusCode);
 
         using (var scope = app.Services.CreateScope())
         {
@@ -125,8 +136,20 @@ public sealed partial class AuthFlowTests
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             Assert.True((await users.AddToRoleAsync((await users.FindByIdAsync(outsider.Id.ToString()))!, "Admin")).Succeeded);
         }
-        Assert.Equal(HttpStatusCode.OK, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", new
-            { isActive = false, reason = "Integration test suspension" }, ct)).StatusCode);
+        var details = await (await c.GetApi(reviewUrl, ct)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(messageId.ToString(), details.GetProperty("targetId").GetString());
+        Assert.False(details.TryGetProperty("content", out _));
+        var evidence = await (await c.WriteApi(HttpMethod.Post, reviewUrl + "/evidence", null, ct)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(messageId, evidence.GetProperty("id").GetGuid());
+        Assert.Equal("Hello from integrated modules", evidence.GetProperty("content").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetApi($"conversations/{conversationId}/messages", ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, reviewUrl, new { status = "Pending", notes = "Invalid transition" }, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, reviewUrl, new { status = "Reviewed", notes = "  " }, ct)).StatusCode);
+        var hold = new { isActive = false, reason = "Integration test suspension", reportId };
+        Assert.Equal(HttpStatusCode.Forbidden, (await b.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", hold, bt)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{bob.Id}/status", hold, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", new { hold.reason, reportId }, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status", hold, ct)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await a.Get("me", at)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await a.Post("refresh")).StatusCode);
         using (var scope = app.Services.CreateScope())
@@ -134,6 +157,26 @@ public sealed partial class AuthFlowTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             Assert.True(await db.ModerationActions.AnyAsync(x => x.TargetUserId == alice.Id.ToString()));
             Assert.False(await db.RefreshTokens.AnyAsync(x => x.UserId == alice.Id && x.RevokedAtUtc == null));
+        }
+        Assert.Equal(HttpStatusCode.OK, (await c.WriteApi(HttpMethod.Patch, $"admin/users/{alice.Id}/status",
+            new { isActive = true, reason = "Appeal accepted", reportId }, ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await a.Get("me", at)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await a.Post("login", new { alice.Email, Password })).StatusCode);
+        var decision = new { status = "Actioned", notes = "Reviewed test evidence" };
+        foreach (var response in await Task.WhenAll(Enumerable.Range(0, 2).Select(_ =>
+            c.WriteApi(HttpMethod.Patch, reviewUrl, decision, ct)))) Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await c.WriteApi(HttpMethod.Patch, reviewUrl,
+            new { status = "Dismissed", notes = "Conflicting decision" }, ct)).StatusCode);
+        var history = await (await c.GetApi(reviewUrl + "/actions", ct)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(new[] { "MessageEvidenceRead", "AccountSuspended", "AccountReactivated", "ReportActioned" },
+            history.EnumerateArray().Select(x => x.GetProperty("action").GetString()));
+        foreach (var row in history.EnumerateArray())
+        {
+            Assert.Equal(reportId, row.GetProperty("reportId").GetGuid());
+            Assert.Equal(outsider.Id.ToString(), row.GetProperty("actorUserId").GetString());
+            Assert.Equal(alice.Id.ToString(), row.GetProperty("targetUserId").GetString());
+            Assert.False(string.IsNullOrWhiteSpace(row.GetProperty("reason").GetString()));
+            Assert.Equal(DateTimeKind.Utc, row.GetProperty("createdAtUtc").GetDateTime().Kind);
         }
     }
 

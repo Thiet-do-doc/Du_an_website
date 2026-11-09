@@ -79,6 +79,7 @@ public sealed class DiscoveryMatchingPostgresTests
         finally
         {
             await using var cleanup = new AppDbContext(options);
+            await cleanup.Notifications.Where(x => userIds.Contains(x.RecipientId)).ExecuteDeleteAsync();
             await cleanup.Matches.Where(x => userIds.Contains(x.UserLowId) || userIds.Contains(x.UserHighId)).ExecuteDeleteAsync();
             await cleanup.UserLikes.Where(x => userIds.Contains(x.FromUserId) || userIds.Contains(x.ToUserId)).ExecuteDeleteAsync();
             await cleanup.Passes.Where(x => userIds.Contains(x.FromUserId) || userIds.Contains(x.ToUserId)).ExecuteDeleteAsync();

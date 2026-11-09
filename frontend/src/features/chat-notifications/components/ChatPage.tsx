@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { authenticatedFetch } from '../../auth/api';
+import { blockUser } from '../../safety-admin/api/blocks';
+import '../../gifts/gifts.css';
+import { GiftArt } from '../../gifts/GiftArt';
 import { HubConnection, HubConnectionBuilder, HubConnectionState,
   HttpTransportType, LogLevel } from '@microsoft/signalr';
-import { getConversations, getMessages, getNotifications, markRead, reportMessage } from '../api/chatApi';
-import type { ChatNotification, Conversation, Delivery, Message } from '../types/chat';
+import { getConversations, getMessages, reportMessage } from '../api/chatApi';
+import type { Conversation, Delivery, Message } from '../types/chat';
 
 type Props = { token: string; userId: string; displayName: string; getAccessToken?: () => Promise<string> };
 type ConnectionStatus = 'Đang kết nối' | 'Đã kết nối' | 'Đang nối lại' | 'Mất kết nối';
@@ -16,22 +20,19 @@ const mergeById = (before: Message[], incoming: Message[]) => {
   return [...map.values()].sort((a, b) =>
     a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id));
 };
-const mergeNotificationsById = (before: ChatNotification[], incoming: ChatNotification[]) => {
-  const map = new Map(before.map(x => [x.id, x]));
-  for (const item of incoming) map.set(item.id, item);
-  return [...map.values()].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
-};
-
 export function ChatPage({ token, userId, displayName, getAccessToken }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [current, setCurrent] = useState<string | null>(() => new URLSearchParams(location.search).get('conversation'));
   const [messages, setMessages] = useState<Message[]>([]);
-  const [notifications, setNotifications] = useState<ChatNotification[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
-  const [notificationCursor, setNotificationCursor] = useState<string | null>(null);
-  const [notificationBusy, setNotificationBusy] = useState(false);
   const [pending, setPending] = useState<Delivery[]>([]);
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [gifts, setGifts] = useState<{ code: string; name: string; description: string }[]>([]);
+  const [giftBusy, setGiftBusy] = useState(false);
+  const [giftLoading, setGiftLoading] = useState(false);
+  const [giftError, setGiftError] = useState('');
+  const giftSending = useRef(false);
+  const giftPending = useRef<{ conversation: string; code: string; id: string } | null>(null);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState<ConnectionStatus>('Đang kết nối');
   const [busy, setBusy] = useState(false);
@@ -40,39 +41,32 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   const connectionRef = useRef<HubConnection | null>(null);
   const currentRef = useRef(current);
   const messagesRef = useRef(messages);
-  const notificationsRef = useRef(notifications);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => { currentRef.current = current; }, [current]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
-  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
+  useEffect(() => {
+    const pane = bottomRef.current?.parentElement;
+    pane?.scrollTo({ top: pane.scrollHeight, behavior: 'smooth' });
+  }, [messages.length]);
 
   const refreshList = useCallback(async () => {
-    const data = await getConversations(token);
-    setConversations(data.items);
-    setCurrent(prev => prev && data.items.some(x => x.id === prev)
-      ? prev : data.items[0]?.id ?? null);
-  }, [token]);
-  const refreshNotifications = useCallback(async () => {
-    const data = await getNotifications(token);
-    setNotifications(prev => mergeNotificationsById(prev, data.items));
-    setNotificationCursor(data.nextCursor);
-  }, [token]);
-
-  const catchUpNotifications = useCallback(async () => {
-    const latest = notificationsRef.current[0];
-    if (!latest) {
-      await refreshNotifications();
-      return;
+    const requested = new URLSearchParams(location.search).get('conversation');
+    const wanted = currentRef.current || requested;
+    let page = 1;
+    let data = await getConversations(token);
+    const items = [...data.items];
+    while (wanted && data.hasMore && !items.some(x => x.id === wanted)) {
+      data = await getConversations(token, ++page);
+      items.push(...data.items);
     }
-    let afterId: string | null = latest.id;
-    for (let pageIndex = 0; afterId && pageIndex < 50; pageIndex++) {
-      const page = await getNotifications(token, { afterId, pageSize: 50 });
-      setNotifications(old => mergeNotificationsById(old, page.items));
-      afterId = page.nextAfterId;
-    }
-  }, [token, refreshNotifications]);
-
+    setConversations(items);
+    setCurrent(prev => {
+      const selected = prev || requested;
+      return selected ? items.find(x => x.id === selected)?.id ?? null : items[0]?.id ?? null;
+    });
+    if (requested && wanted === requested && !items.some(x => x.id === requested))
+      setError('Cuộc trò chuyện này hiện không thể mở.');
+  }, [token]);
   const catchUp = useCallback(async () => {
     const id = currentRef.current;
     if (!id) return;
@@ -97,8 +91,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
 
   useEffect(() => {
     void refreshList().catch(e => setError(String(e)));
-    void refreshNotifications().catch(e => setError(String(e)));
-  }, [refreshList, refreshNotifications]);
+  }, [refreshList]);
 
   useEffect(() => {
     if (!current) {
@@ -135,9 +128,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
     };
     const synchronize = () => {
       void catchUp().catch(e => setError(String(e)));
-      void catchUpNotifications().catch(e => setError(String(e)));
       void refreshList().catch(() => {});
-      void refreshNotifications().catch(() => {});
     };
     const requiresLogin = (cause: unknown) => {
       const text = cause instanceof Error ? cause.message : String(cause ?? '');
@@ -183,15 +174,10 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
     });
     conn.on('MatchCreated', () => {
       void refreshList().catch(() => {});
-      void catchUpNotifications().catch(() => {});
-      void refreshNotifications().catch(() => {});
     });
     conn.on('MatchEnded', () => {
       // Keep the conversation/history available, but refresh canSend from the current Match row.
       void refreshList().catch(e => setError(String(e)));
-    });
-    conn.on('NotificationCreated', (item: ChatNotification) => {
-      setNotifications(prev => mergeNotificationsById(prev, [item]));
     });
     conn.onreconnecting(() => { if (!disposed) setStatus('Đang nối lại'); });
     conn.onreconnected(() => {
@@ -213,7 +199,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       connectionRef.current = null;
       void conn.stop();
     };
-  }, [token, getAccessToken, refreshList, refreshNotifications, catchUp, catchUpNotifications]);
+  }, [token, getAccessToken, refreshList, catchUp]);
 
   const sendWithId = async (content: string, clientMessageId: string) => {
     const conn = connectionRef.current;
@@ -253,21 +239,6 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       setCursor(page.nextCursor);
     } catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
-  const read = async (notificationId: string) => {
-    try {
-      const item = await markRead(token, notificationId);
-      setNotifications(prev => prev.map(x => x.id === item.id ? item : x));
-    } catch (e) { setError(String(e)); }
-  };
-  const loadOldNotifications = async () => {
-    if (!notificationCursor) return;
-    try {
-      setNotificationBusy(true);
-      const page = await getNotifications(token, { cursor: notificationCursor });
-      setNotifications(prev => mergeNotificationsById(prev, page.items));
-      setNotificationCursor(page.nextCursor);
-    } catch (e) { setError(String(e)); } finally { setNotificationBusy(false); }
-  };
   const report = async (item: Message) => {
     const reason = window.prompt('Lý do báo cáo tin nhắn:');
     if (!reason?.trim()) return;
@@ -287,8 +258,46 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       } else setError(message);
     }
   };
+  useEffect(() => { setGiftOpen(false); setGiftError(''); }, [current]);
+  async function openGifts() {
+    if (giftOpen) { setGiftOpen(false); return; }
+    setGiftOpen(true); setGiftError(''); setGiftLoading(true);
+    try { setGifts(await authenticatedFetch('/api/v1/gifts')); }
+    catch { setGiftError('Chưa tải được quà. Đóng rồi mở lại để thử lại.'); }
+    finally { setGiftLoading(false); }
+  }
+  async function sendGift(code: string) {
+    const conn = connectionRef.current;
+    if (!current || !active?.canSend || giftSending.current || conn?.state !== HubConnectionState.Connected) return;
+    giftSending.current = true; setGiftBusy(true); setGiftError('');
+    const pending = giftPending.current;
+    if (!pending || pending.conversation !== current || pending.code !== code)
+      giftPending.current = { conversation: current, code, id: crypto.randomUUID() };
+    const attempt = giftPending.current!;
+    try {
+      const saved = await conn.invoke<Message>('SendGift', attempt.conversation, attempt.code, attempt.id);
+      if (currentRef.current === saved.conversationId) {
+        setMessages(old => mergeById(old, [saved])); setGiftOpen(false);
+      }
+      giftPending.current = null;
+      void refreshList().catch(() => {});
+    } catch { setGiftError('Chưa xác nhận được việc gửi quà. Chọn lại món quà để thử lại, quà sẽ không bị gửi trùng.'); }
+    finally { giftSending.current = false; setGiftBusy(false); }
+  }
+  const blockPartner = async (target: Conversation) => {
+    if (!window.confirm(`Chặn ${target.partnerName}? Cuộc trò chuyện và kết nối với người này sẽ bị ẩn cho tới khi bạn bỏ chặn.`)) return;
+    setError('');
+    try {
+      await blockUser(target.partnerId);
+      setGiftOpen(false);
+      setCurrent(null);
+      setMessages([]);
+      await refreshList();
+      window.dispatchEvent(new Event('notifications-read'));
+      setFeedback(`Đã chặn ${target.partnerName}. Bạn có thể bỏ chặn trong mục An toàn.`);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
   const active = conversations.find(x => x.id === current);
-  const unread = notifications.filter(x => !x.readAt).length;
 
   return (
     <main className="shell">
@@ -315,14 +324,20 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
             ))}
         </aside>
         <section className="chat-pane" aria-label="Cửa sổ trò chuyện">
-          <div className="chat-top"><h2>{active?.partnerName ?? 'Chọn cuộc trò chuyện'}</h2>
-            <small>{active?.canSend ? 'Hội thoại đang hoạt động' : 'Chưa chọn hoặc không thể gửi'}</small></div>
+          <div className="chat-top">
+            <div><h2>{active?.partnerName ?? 'Chọn cuộc trò chuyện'}</h2>
+              <small>{active?.canSend ? 'Hội thoại đang hoạt động' : 'Chưa chọn hoặc không thể gửi'}</small></div>
+            {active && <div className="chat-top-actions">
+              <a className="chat-action" href={'/profile?user=' + encodeURIComponent(active.partnerId)}>Hồ sơ</a>
+              <button type="button" className="chat-block" onClick={() => void blockPartner(active)}>Chặn</button>
+            </div>}
+          </div>
           <div className="messages" aria-live="polite">
             {cursor && <button className="older" onClick={() => void loadOld()} disabled={busy}>Tải tin nhắn cũ</button>}
             {busy && <p className="muted">Đang tải...</p>}
             {messages.length === 0 && !busy && <div className="empty centered">Chưa có tin nhắn.</div>}
             {messages.map(m => <div key={m.id} className={`bubble-row ${m.senderId === userId ? 'mine' : ''}`}>
-              <div className="bubble"><div className="bubble-text">{m.content}</div>
+              <div className="bubble">{m.giftCode && <><GiftArt code={m.giftCode}/><small>Quà tặng mylove</small></>}<div className="bubble-text">{m.content}</div>
                 <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
                 {m.senderId !== userId && <button type="button" className="report-message"
                   onClick={() => void report(m)}>Báo cáo</button>}
@@ -334,25 +349,23 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
               </div></div>)}
             <div ref={bottomRef} />
           </div>
+          {giftOpen && <section className="chat-gifts" aria-label="Chọn quà tặng">
+            <header><strong>Tặng quà cho {active?.partnerName}</strong><button type="button" onClick={() => setGiftOpen(false)} aria-label="Đóng quà tặng">✕</button></header>
+            <p>Quà ảo miễn phí · Chọn một món để gửi vào hội thoại.</p>
+            {giftLoading && <p role="status">Đang tải quà…</p>}
+            {giftError && <p role="alert">{giftError}</p>}
+            <div>{gifts.map(gift => <button key={gift.code} type="button" disabled={giftBusy || !active?.canSend || status !== 'Đã kết nối'} onClick={() => void sendGift(gift.code)} title={gift.description}>
+              <GiftArt code={gift.code}/><span>{gift.name}</span>
+            </button>)}</div>{giftBusy && <p role="status">Đang gửi quà…</p>}
+          </section>}
           <form className="composer" onSubmit={e => { e.preventDefault(); void send(); }}>
+            <button type="button" className="gift-toggle" aria-label="Tặng quà" aria-expanded={giftOpen} disabled={!active?.canSend || giftBusy} onClick={() => void openGifts()}>🎁</button>
             <label htmlFor="message-input" className="sr-only">Nhập nội dung tin nhắn</label>
             <input id="message-input" value={draft} onChange={e => setDraft(e.target.value)}
               disabled={!active?.canSend} maxLength={2000} placeholder="Nhập tin nhắn..." />
             <button disabled={!active?.canSend || !draft.trim() || status !== 'Đã kết nối'} type="submit">Gửi</button>
           </form>
         </section>
-        <aside className="notifications">
-          <div className="section-heading"><h2>Thông báo</h2><span>{unread} mới</span></div>
-          {notifications.length === 0 ? <p className="empty">Chưa có thông báo.</p>
-            : notifications.map(item => <div className={`notice ${item.readAt ? '' : 'unread'}`} key={item.id}>
-              <b>{item.type === 'match' ? 'Ghép đôi mới' : 'Tin nhắn mới'}</b>
-              <small>{dateTime(item.createdAt)}</small>
-              {!item.readAt && <button onClick={() => void read(item.id)}>Đánh dấu đã đọc</button>}
-            </div>)}
-          {notificationCursor && <button className="older" onClick={() => void loadOldNotifications()} disabled={notificationBusy}>
-            {notificationBusy ? 'Đang tải…' : 'Tải thông báo cũ'}
-          </button>}
-        </aside>
       </div>
     </main>
   );

@@ -9,6 +9,11 @@ public sealed class ConfirmEmailRequest
     public Guid UserId { get; set; }
     [Required, StringLength(4096)] public string Token { get; set; } = string.Empty;
 }
+public sealed class VerifyEmailCodeRequest
+{
+    [Required, EmailAddress, StringLength(256)] public string Email { get; set; } = string.Empty;
+    [Required, RegularExpression("^[0-9]{6}$", ErrorMessage = "Nhập đủ 6 chữ số.")] public string Code { get; set; } = string.Empty;
+}
 public sealed class ResetPasswordRequest
 {
     [Required, EmailAddress, StringLength(256)] public string Email { get; set; } = string.Empty;

@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using DatingApp.Api.Modules.Profiles.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -160,6 +161,26 @@ builder.Services.AddScoped<IDatabaseProbe, PostgresDatabaseProbe>();
 
 var app = builder.Build();
 
+// One-shot command for a release operator on the private Compose network.
+if (builder.Configuration.GetValue<bool>("migrate"))
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+    return;
+}
+
+if (args.Contains("--init-admin"))
+{
+    if (!app.Environment.IsDevelopment())
+        throw new InvalidOperationException("--init-admin chỉ dùng trong môi trường Development.");
+    if (string.IsNullOrWhiteSpace(connectionString))
+        throw new InvalidOperationException("Cần cấu hình ConnectionStrings:DefaultConnection và chạy migration trước.");
+
+    using var scope = app.Services.CreateScope();
+    await AdminProvisioning.CreateLocalAdminAsync(scope.ServiceProvider);
+    return;
+}
+
 // Chỉ cấp Admin cho tài khoản đã xác nhận bằng lệnh local có kiểm soát.
 if (builder.Configuration["grant-admin"] is string adminEmail)
 {
@@ -169,15 +190,18 @@ if (builder.Configuration["grant-admin"] is string adminEmail)
     var user = await users.FindByEmailAsync(adminEmail);
     if (user is null || !user.EmailConfirmed || !user.IsActive)
         throw new InvalidOperationException("Chỉ cấp Admin cho tài khoản đang hoạt động và đã xác nhận email.");
-    if (!await roles.RoleExistsAsync("Admin"))
-    {
-        var roleResult = await roles.CreateAsync(new IdentityRole<Guid>("Admin"));
-        if (!roleResult.Succeeded) throw new InvalidOperationException("Không tạo được vai trò Admin.");
-    }
-    var result = await users.AddToRoleAsync(user, "Admin");
-    if (!result.Succeeded && !await users.IsInRoleAsync(user, "Admin"))
-        throw new InvalidOperationException("Không cấp được vai trò Admin.");
+    await AdminProvisioning.GrantRoleAsync(users, roles, user);
     return;
+}
+
+// Only the private proxy network may identify the original HTTPS scheme.
+if (builder.Configuration["ReverseProxy:TrustedNetwork"] is { Length: > 0 } proxyCidr)
+{
+    var network = System.Net.IPNetwork.Parse(proxyCidr);
+    if (network.PrefixLength == 0) throw new InvalidOperationException("ReverseProxy:TrustedNetwork must be a scoped network.");
+    var forwarding = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedProto };
+    forwarding.KnownIPNetworks.Add(network);
+    app.UseForwardedHeaders(forwarding);
 }
 
 // Xử lý lỗi HTTP.

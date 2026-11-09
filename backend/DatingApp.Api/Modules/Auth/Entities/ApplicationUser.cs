@@ -5,6 +5,9 @@ namespace DatingApp.Api.Modules.Auth.Entities;
 public sealed class ApplicationUser : IdentityUser<Guid>
 {
     public bool IsActive { get; set; } = true;
+    public byte[]? ConfirmationCodeHash { get; set; }
+    public DateTimeOffset? ConfirmationCodeExpiresAt { get; set; }
+    public int ConfirmationCodeFailures { get; set; }
     public ApplicationUser()
     {
         Id = Guid.NewGuid();

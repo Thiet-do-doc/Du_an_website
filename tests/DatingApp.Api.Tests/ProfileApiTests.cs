@@ -114,9 +114,7 @@ public sealed partial class AuthFlowTests
         var response = await browser.Post("register", new { email, Password, confirmPassword = Password, dateOfBirth });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var id = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("userId").GetGuid();
-        var query = QueryHelpers.ParseQuery(new Uri(app.Mail.Links.Last()).Query);
-        Assert.Equal(HttpStatusCode.OK, (await browser.Post("confirm-email", new
-        { userId = id, token = query["token"].ToString() })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser.Post("verify-email-code", new { email, code = app.Mail.LastCode })).StatusCode);
         return (id, email);
     }
 }

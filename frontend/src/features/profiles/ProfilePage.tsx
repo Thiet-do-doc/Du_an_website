@@ -1,4 +1,5 @@
 import { PrivatePhoto } from './PrivatePhoto';
+import { photoTypes } from '../../shared/uploadImage';
 import { useCallback, useEffect, useState } from 'react';
 import { ProtectedRoute } from '../auth/AuthProvider';
 import { deletePhoto, getInterests, getMyProfile, reorderPhotos, saveProfile, setAvatar, uploadPhoto } from './api';
@@ -13,12 +14,14 @@ function ProfileEditor() {
   const [gender, setGender] = useState(''); const [discoverable, setDiscoverable] = useState(true);
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
   const [error, setError] = useState(''); const [notice, setNotice] = useState('');
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const load = useCallback(async () => {
     setError(''); setLoading(true);
     try {
       const [p, choices] = await Promise.all([getMyProfile(), getInterests()]);
       setProfile(p); setInterests(choices); setName(p.displayName); setBio(p.bio ?? ''); setCity(p.city ?? '');
       setGender(p.gender ?? ''); setDiscoverable(p.isDiscoverable); setSelected(p.interests.map(x => x.id));
+      window.dispatchEvent(new CustomEvent('profile-updated', { detail: p }));
     } catch { setError('Không tải được hồ sơ. Hãy kiểm tra kết nối và thử lại.'); }
     finally { setLoading(false); }
   }, []);
@@ -30,11 +33,25 @@ function ProfileEditor() {
     finally { setBusy(false); }
   }
   async function submit(event: React.FormEvent) {
-    event.preventDefault(); await run(() => saveProfile({ displayName: name, bio, city, gender, isDiscoverable: discoverable, interestIds: selected }), 'Đã lưu hồ sơ.');
+    event.preventDefault();
+    await run(async () => {
+      const saved = await saveProfile({ displayName: name, bio, city, gender, isDiscoverable: discoverable, interestIds: selected });
+      setProfile(saved);
+      if (pendingPhoto) {
+        await uploadPhoto(pendingPhoto);
+        setPendingPhoto(null);
+      }
+    }, pendingPhoto ? 'Đã lưu hồ sơ và ảnh đại diện.' : 'Đã lưu hồ sơ.');
   }
   async function upload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]; event.target.value = '';
-    if (file) await run(() => uploadPhoto(file), 'Đã thêm ảnh.');
+    if (!file) return;
+    if (!profile?.displayName) {
+      setPendingPhoto(file);
+      setError(''); setNotice('');
+      return;
+    }
+    await run(async () => { await uploadPhoto(file); setPendingPhoto(null); }, 'Đã thêm ảnh.');
   }
   async function move(index: number, offset: number) {
     if (!profile) return;
@@ -48,6 +65,8 @@ function ProfileEditor() {
     <div className="profile-heading"><div><p className="eyebrow">HỒ SƠ CỦA BẠN</p><h1>Hãy để câu chuyện của bạn bắt đầu.</h1>
       <p className="profile-lead">Hoàn thiện hồ sơ để mọi người hiểu thêm về bạn. Ngày sinh và email không hiển thị công khai.</p></div>
       {profile?.isComplete && <span className="profile-badge">Hồ sơ hoàn thiện</span>}</div>
+    {profile && !profile.isComplete && <p className="profile-notice" role="status">Chào mừng bạn! Hãy lưu tên hiển thị và chọn ít nhất một sở thích để bắt đầu sử dụng mylove.</p>}
+    {profile?.isComplete && <a className="btn btn-outline-dark" href="/">Tiếp tục đến trang chủ</a>}
     {error && <p className="profile-alert" role="alert">{error}</p>}{notice && <p className="profile-notice" role="status">{notice}</p>}
     <form className="profile-card" onSubmit={submit}>
       <h2>Giới thiệu</h2>
@@ -61,7 +80,9 @@ function ProfileEditor() {
       <button className="btn btn-dark" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu hồ sơ'}</button>
     </form>
     <section className="profile-card" aria-labelledby="photos-heading"><div className="profile-section-head"><div><h2 id="photos-heading">Ảnh của bạn</h2><p>Tối đa 6 ảnh · JPEG, PNG hoặc WebP · tối đa 5 MB mỗi ảnh</p></div>
-      <label className="btn btn-outline-dark upload-label">Thêm ảnh<input type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} disabled={busy || (profile?.photos.length ?? 0) >= 6} /></label></div>
+      <label className="btn btn-outline-dark upload-label">{busy ? 'Đang xử lý…' : 'Thêm ảnh'}<input type="file" accept={photoTypes} onChange={upload} disabled={busy || (profile?.photos.length ?? 0) >= 6} /></label></div>
+      {pendingPhoto && <p role="status">Đã chọn {pendingPhoto.name}. Điền tên hiển thị và bấm <strong>Lưu hồ sơ</strong> để tải ảnh này lên.
+        {' '}<button type="button" disabled={busy} onClick={() => setPendingPhoto(null)}>Bỏ chọn</button></p>}
       <div className="photo-grid">{profile?.photos.length ? [...profile.photos].sort((a, b) => a.sortOrder - b.sortOrder).map((photo, i) => <article className="photo-item" key={photo.id}>
         <PrivatePhoto src={photo.url} alt={photo.isAvatar ? 'Ảnh đại diện' : `Ảnh hồ sơ ${i + 1}`} />{photo.isAvatar && <span className="avatar-label">Ảnh đại diện</span>}
         <div className="photo-actions"><button type="button" onClick={() => void run(() => setAvatar(photo.id), 'Đã chọn ảnh đại diện.')} disabled={busy || photo.isAvatar}>Chọn đại diện</button>

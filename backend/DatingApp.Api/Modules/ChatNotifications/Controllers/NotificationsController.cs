@@ -12,6 +12,10 @@ namespace DatingApp.Api.Modules.ChatNotifications.Controllers;
 public sealed class NotificationsController(NotificationService service, IChatPermissions permissions,
     ICurrentUser currentUser) : ControllerBase
 {
+    [HttpGet("unread-count")]
+    public async Task<IActionResult> Unread(CancellationToken ct) =>
+        Ok(new { count = await service.UnreadCountAsync(currentUser.UserId!.Value, ct) });
+
     [HttpGet]
     public async Task<IActionResult> Index([FromQuery] int page = 1,
         [FromQuery] int pageSize = 20, [FromQuery] string? cursor = null,

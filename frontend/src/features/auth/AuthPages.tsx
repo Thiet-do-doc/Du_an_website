@@ -1,11 +1,24 @@
 ﻿import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, authenticatedFetch, publicPost } from './api';
 import { ProtectedRoute, useAuth } from './AuthProvider';
-export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'confirm-email' | 'resend-confirmation';
-type Mode = AuthMode;
+import { EmailCodePage, startEmailVerification } from './EmailCodePage';
+import AdminReports from '../safety-admin/AdminReports';
+import { finishSignIn } from '../../app/WelcomeMist';
+export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'confirm-email' | 'resend-confirmation' | 'verify-email';
+type Mode = Exclude<AuthMode, 'verify-email'>;
 const titles: Record<Mode, string> = { login: 'Đăng nhập', register: 'Tạo tài khoản', 'forgot-password': 'Quên mật khẩu',
-  'reset-password': 'Đặt lại mật khẩu', 'confirm-email': 'Xác nhận email', 'resend-confirmation': 'Gửi lại email xác nhận' };
-export function AuthPage({ mode }: { mode: Mode }) {
+  'reset-password': 'Đặt lại mật khẩu', 'confirm-email': 'Xác nhận email', 'resend-confirmation': 'Gửi mã xác nhận' };
+export function AuthPage({ mode }: { mode: AuthMode }) {
+  if (mode === 'verify-email') return <EmailCodePage />;
+  return <section className="auth-panel auth-glass">
+    {['login', 'register'].includes(mode) && <nav className={'auth-tabs mode-' + mode} aria-label="Tài khoản">
+      <a href="/login" aria-current={mode === 'login' ? 'page' : undefined}>Đăng nhập</a>
+      <a href="/register" aria-current={mode === 'register' ? 'page' : undefined}>Đăng ký</a>
+    </nav>}
+    <div className={'auth-sheet sheet-' + mode} key={mode}><AuthForm mode={mode} /></div>
+  </section>;
+}
+function AuthForm({ mode }: { mode: Mode }) {
   const auth = useAuth();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -16,12 +29,13 @@ export function AuthPage({ mode }: { mode: Mode }) {
     event.preventDefault(); setBusy(true); setMessage(''); setError(''); setFieldErrors({});
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     try {
-      if (mode === 'login') { await auth.login(String(values.email), String(values.password)); location.assign('/'); }
+      if (mode === 'login') { await auth.login(String(values.email), String(values.password)); finishSignIn(); }
       else {
         const result = await publicPost<{ message: string }>(mode,
           mode === 'confirm-email' ? { userId: params.get('userId'), token: params.get('token') } :
           mode === 'reset-password' ? { ...values, token: params.get('token') } : values);
-        setMessage(result.message);
+        if (mode === 'register' || mode === 'resend-confirmation') startEmailVerification(String(values.email).trim());
+        else setMessage(result.message);
       }
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Không thể kết nối máy chủ. Hãy thử lại.');
@@ -34,8 +48,7 @@ export function AuthPage({ mode }: { mode: Mode }) {
     const matching = Object.entries(fieldErrors).filter(([key]) => key.toLowerCase().endsWith(name.toLowerCase()));
     return matching.flatMap(([, values]) => values).map((value, index) => <div className="text-danger small" key={index}>{value}</div>);
   }
-  return <section className="auth-panel">
-    {['login', 'register'].includes(mode) && <nav className="auth-tabs" aria-label="Tài khoản"><a href="/login" aria-current={mode === 'login' ? 'page' : undefined}>Đăng nhập</a><a href="/register" aria-current={mode === 'register' ? 'page' : undefined}>Đăng ký</a></nav>}
+  return <>
     <span className="auth-heart" aria-hidden="true">♡</span><h1>{mode === 'login' ? 'Rất vui khi gặp bạn!' : titles[mode]}</h1>
     <p className="auth-intro">{mode === 'login' ? 'Đăng nhập để tiếp tục câu chuyện của bạn.' : mode === 'register' ? 'Chỉ vài thông tin nhỏ để bắt đầu kết nối.' : 'Một bước nhỏ để trở lại với những kết nối của bạn.'}</p><form onSubmit={submit}>
     {mode !== 'confirm-email' && <label>Email<input name="email" type="email" autoComplete="email" required maxLength={256}
@@ -48,11 +61,11 @@ export function AuthPage({ mode }: { mode: Mode }) {
     {mode === 'confirm-email' && <p>Bấm nút để xác nhận địa chỉ email của bạn.</p>}
     {mode === 'login' && <a className="forgot-link" href="/forgot-password">Quên mật khẩu?</a>}
     <button className="btn btn-dark auth-submit" disabled={busy}>{busy ? 'Đang xử lý…' : titles[mode]} {!busy && <span aria-hidden="true">↗</span>}</button>
-    {message && <div className="auth-success" role="status"><p>{message}</p>{mode === 'register' && <p>Xác nhận email rồi quay lại đăng nhập để vào mylove.</p>}{['confirm-email', 'reset-password'].includes(mode) && <a href="/login">Đăng nhập ngay →</a>}</div>}
+    {message && <div className="auth-success" role="status"><p>{message}</p>{['confirm-email', 'reset-password'].includes(mode) && <a href="/login">Đăng nhập ngay →</a>}</div>}
     {error && <div className="text-danger mt-3" role="alert"><p>{error}</p>
       {Object.entries(fieldErrors).map(([key, values]) => <p key={key}>{values.join(' ')}</p>)}</div>}
   </form><nav className="auth-links">{mode !== 'login' && <a href="/login">Về đăng nhập</a>}{mode === 'login' && <a href="/register">Chưa có tài khoản? Đăng ký</a>}
-    <a href="/resend-confirmation">Gửi lại email xác nhận</a></nav></section>;
+    <a href="/resend-confirmation">Gửi lại mã xác nhận</a></nav></>;
 }
 function AccountContent() {
   const auth = useAuth();
@@ -70,13 +83,7 @@ function AccountContent() {
       <p>Vai trò: {me.roles.length ? me.roles.join(', ') : 'Người dùng'}</p></> : <p role="status">Đang tải tài khoản…</p>}
     {error && <p role="alert">{error}</p>}
     <button className="btn btn-dark" disabled={busy} onClick={() => { void signOut(); }}>Đăng xuất</button>
-    <nav className="auth-links"><a href="/admin">Kiểm tra quyền quản trị</a><a href="/">Về trang chủ</a></nav></section>;
+    <nav className="auth-links">{me?.roles.includes('Admin') && <a href="/admin">Quản lý báo cáo</a>}<a href="/">Về trang chủ</a></nav></section>;
 }
 export function AccountPage() { return <ProtectedRoute><AccountContent /></ProtectedRoute>; }
-function AdminContent() {
-  const [message, setMessage] = useState('Đang kiểm tra quyền…');
-  useEffect(() => { void authenticatedFetch('/api/v1/auth/admin-check').then(() => setMessage('Bạn có quyền quản trị.'))
-    .catch(error => setMessage(error instanceof ApiError && error.status === 403 ? 'Bạn không có quyền quản trị.' : error.message)); }, []);
-  return <section className="auth-panel"><h1>Quyền quản trị</h1><p role="status">{message}</p><a href="/account">Về tài khoản</a></section>;
-}
-export function AdminPage() { return <ProtectedRoute><AdminContent /></ProtectedRoute>; }
+export function AdminPage() { return <ProtectedRoute><AdminReports /></ProtectedRoute>; }

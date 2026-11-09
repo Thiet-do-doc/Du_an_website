@@ -32,6 +32,7 @@ public sealed class MessageConfig : IEntityTypeConfiguration<ChatMessage>
         e.HasKey(x => x.Id);
         e.Property(x => x.Id).ValueGeneratedNever();
         e.Property(x => x.Content).HasMaxLength(2000).IsRequired();
+        e.Property(x => x.GiftCode).HasMaxLength(24);
         e.HasIndex(x => new { x.ConversationId, x.SentAt, x.Id });
         e.HasIndex(x => new { x.SenderId, x.ClientMessageId }).IsUnique();
         e.HasOne<Conversation>().WithMany().HasForeignKey(x => x.ConversationId)
@@ -50,6 +51,7 @@ public sealed class NotificationConfig : IEntityTypeConfiguration<AppNotificatio
         e.Property(x => x.Id).ValueGeneratedNever();
         e.Property(x => x.Type).HasMaxLength(40).IsRequired();
         e.Property(x => x.DedupeKey).HasMaxLength(120).IsRequired();
+        e.Property(x => x.Text).HasMaxLength(240);
         e.HasIndex(x => new { x.RecipientId, x.DedupeKey }).IsUnique();
         e.HasIndex(x => new { x.RecipientId, x.ReadAt });
         e.HasIndex(x => new { x.RecipientId, x.CreatedAt, x.Id });

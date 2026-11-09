@@ -74,6 +74,19 @@ public sealed class DiscoveryController : ControllerBase
         catch (InvalidOperationException) { return Problem(statusCode: 503, title: "Chưa sẵn sàng", detail: "Database hoặc module phụ thuộc chưa được cấu hình."); }
     }
 
+    [HttpGet("user-likes/received")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> Received(CancellationToken ct)
+    {
+        if (!TryGetCurrentUserId(out var viewer)) return Unauthorized();
+        var ids = await HttpContext.RequestServices.GetRequiredService<IMatchService>().GetReceivedLikeIdsAsync(viewer, ct);
+        var blocked = await HttpContext.RequestServices.GetRequiredService<IBlockLookup>().GetBlockedUserIdsAsync(viewer, ct);
+        var visible = await HttpContext.RequestServices.GetRequiredService<IDiscoveryProfileQuery>()
+            .GetByIdsAsync(viewer, ids.Where(id => !blocked.Contains(id)).ToArray(), ct);
+        var byId = visible.ToDictionary(p => p.UserId);
+        return Ok(ids.Where(byId.ContainsKey).Select(id => byId[id]));
+    }
+
     [HttpDelete("matches/{matchId:guid}")]
     public async Task<IActionResult> Unmatch(Guid matchId, CancellationToken cancellationToken)
     {

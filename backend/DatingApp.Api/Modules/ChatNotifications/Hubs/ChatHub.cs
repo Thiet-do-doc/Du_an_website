@@ -32,14 +32,19 @@ public sealed class ChatHub(ChatService chats, IChatPermissions permissions) : H
     public Task LeaveConversation(Guid conversationId) =>
         Groups.RemoveFromGroupAsync(Context.ConnectionId, Group(conversationId), Context.ConnectionAborted);
 
-    public async Task<MessageDto> SendMessage(Guid conversationId, string content, Guid clientMessageId)
+    public Task<MessageDto> SendMessage(Guid conversationId, string content, Guid clientMessageId) =>
+        SendAndNotify(conversationId, sender => chats.SendMessageAsync(conversationId, sender, content, clientMessageId, Context.ConnectionAborted));
+
+    public Task<MessageDto> SendGift(Guid conversationId, string giftCode, Guid clientMessageId) =>
+        SendAndNotify(conversationId, sender => chats.SendGiftAsync(conversationId, sender, giftCode, clientMessageId, Context.ConnectionAborted));
+
+    private async Task<MessageDto> SendAndNotify(Guid conversationId, Func<Guid, Task<SendResult>> save)
     {
         var senderId = UserId();
         SendResult result;
         try
         {
-            result = await chats.SendMessageAsync(conversationId, senderId, content, clientMessageId,
-                Context.ConnectionAborted);
+            result = await save(senderId);
         }
         catch (ChatDomainException e) { throw new HubException(e.Message); }
         catch (ChatDependencyUnavailableException e) { throw new HubException(e.Message); }

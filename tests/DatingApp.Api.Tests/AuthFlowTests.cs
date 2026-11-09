@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Collections.Concurrent;
@@ -35,10 +36,35 @@ public sealed partial class AuthFlowTests
             { email, Password, confirmPassword = Password, dateOfBirth = "2000-01-01" })).StatusCode);
         app.Mail.Fails = false;
         Assert.Equal(HttpStatusCode.OK, (await browser.Post("resend-confirmation", new { email })).StatusCode);
-        var query = QueryHelpers.ParseQuery(new Uri(app.Mail.Links.Last()).Query);
-        Assert.Equal(HttpStatusCode.OK, (await browser.Post("confirm-email", new
-            { userId = query["userId"].ToString(), token = query["token"].ToString() })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser.Post("verify-email-code", new { email, code = app.Mail.LastCode })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await browser.Post("login", new { email, Password })).StatusCode);
+    }
+    [PostgresFact]
+    public async Task ResendReplacesCodeAndOnlyOneConcurrentVerificationCreatesSession()
+    {
+        await using var app = new AuthApp(); using var a = app.Browser(); using var b = app.Browser();
+        var user = await Register(app, a);
+        var oldCode = app.Mail.LastCode;
+        await a.Post("resend-confirmation", new { user.Email });
+        Assert.Single(app.Mail.Messages);
+        var incorrect = oldCode == "000000" ? "000001" : "000000";
+        for (var i = 0; i < 5; i++)
+            Assert.Equal(HttpStatusCode.BadRequest, (await a.Post("verify-email-code", new { user.Email, code = incorrect })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await a.Post("verify-email-code", new { user.Email, code = oldCode })).StatusCode);
+        app.Clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(HttpStatusCode.OK, (await a.Post("resend-confirmation", new { user.Email })).StatusCode);
+        Assert.Equal(2, app.Mail.Messages.Count);
+        var newCode = app.Mail.LastCode;
+        Assert.NotEqual(oldCode, newCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await a.Post("verify-email-code", new { user.Email, code = oldCode })).StatusCode);
+        var verify = new { user.Email, code = newCode };
+        var parallel = await Task.WhenAll(a.Post("verify-email-code", verify), b.Post("verify-email-code", verify));
+        Assert.Single(parallel, r => r.StatusCode == HttpStatusCode.OK);
+        Assert.Single(parallel, r => r.StatusCode == HttpStatusCode.BadRequest);
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await db.RefreshTokens.CountAsync(t => t.UserId == user.Id));
+        Assert.Null((await db.Users.FindAsync(user.Id))!.ConfirmationCodeHash);
     }
     [PostgresFact]
     public async Task AuthEndpointsLimitRequestRate()
@@ -54,13 +80,10 @@ public sealed partial class AuthFlowTests
         await using var app = new AuthApp(); using var browser = app.Browser();
         var account = await Register(app, browser);
         Assert.Equal(HttpStatusCode.Unauthorized, (await browser.Post("login", new { account.Email, Password })).StatusCode);
-        var confirmation = app.Mail.Links.Last();
-        var query = QueryHelpers.ParseQuery(new Uri(confirmation).Query);
-        var confirm = new { userId = query["userId"].ToString(), token = query["token"].ToString() };
-        Assert.Equal(HttpStatusCode.OK, (await browser.Post("confirm-email", confirm)).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await browser.Post("confirm-email", confirm)).StatusCode);
-        var login = await browser.Post("login", new { account.Email, Password }); Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        var access = await Token(login);
+        var confirm = new { account.Email, code = app.Mail.LastCode };
+        Assert.Equal(HttpStatusCode.BadRequest, (await browser.Post("verify-email-code", confirm, csrf: false)).StatusCode);
+        var access = await Token(await browser.Post("verify-email-code", confirm));
+        Assert.Equal(HttpStatusCode.BadRequest, (await browser.Post("verify-email-code", confirm)).StatusCode);
         var originalCookie = browser.Cookies["datingapp.refresh"];
         using (var scope = app.Services.CreateScope())
         {
@@ -91,7 +114,7 @@ public sealed partial class AuthFlowTests
         await using var app = new AuthApp(); using var browser = app.Browser(); var account = await RegisterConfirmed(app, browser);
         var access = await Token(await browser.Post("login", new { account.Email, Password }));
         Assert.Equal(HttpStatusCode.OK, (await browser.Post("forgot-password", new { account.Email })).StatusCode);
-        var query = QueryHelpers.ParseQuery(new Uri(app.Mail.Links.Last()).Query);
+        var query = QueryHelpers.ParseQuery(app.Mail.LastResetLink.Query);
         var reset = new { account.Email, token = query["token"].ToString(), password = "NewDating!2026", confirmPassword = "NewDating!2026" };
         Assert.Equal(HttpStatusCode.OK, (await browser.Post("reset-password", reset)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await browser.Post("reset-password", reset)).StatusCode);
@@ -113,12 +136,19 @@ public sealed partial class AuthFlowTests
             Assert.True((await users.AddToRoleAsync(user, "Admin")).Succeeded);
         }
         Assert.Equal(HttpStatusCode.OK, (await browser.Get("admin-check", access)).StatusCode);
+        var adminMe = await (await browser.Get("me", access)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Admin", Assert.Single(adminMe.GetProperty("roles").EnumerateArray()).GetString());
+        var adminAccess = await Token(await browser.Post("login", new { account.Email, Password }));
+        var adminJwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(adminAccess);
+        Assert.Equal("Admin", Assert.Single(adminJwt.Claims, c => c.Type == ClaimTypes.Role || c.Type == "role").Value);
         using (var scope = app.Services.CreateScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             Assert.True((await users.RemoveFromRoleAsync((await users.FindByIdAsync(account.Id.ToString()))!, "Admin")).Succeeded);
         }
         Assert.Equal(HttpStatusCode.Forbidden, (await browser.Get("admin-check", access)).StatusCode);
+        var userMe = await (await browser.Get("me", access)).Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("User", Assert.Single(userMe.GetProperty("roles").EnumerateArray()).GetString());
         using (var scope = app.Services.CreateScope())
         {
             Assert.True(await scope.ServiceProvider.GetRequiredService<IAccountAccess>().SetActiveAsync(account.Id, false));
@@ -157,9 +187,8 @@ public sealed partial class AuthFlowTests
     public async Task ExpiredConfirmationResetAndRefreshAreRejected()
     {
         await using var app = new AuthApp(shortEmailLifetime: true); using var browser = app.Browser(); var account = await Register(app, browser);
-        var query = QueryHelpers.ParseQuery(new Uri(app.Mail.Links.Last()).Query);
-        await Task.Delay(2100);
-        Assert.Equal(HttpStatusCode.BadRequest, (await browser.Post("confirm-email", new { userId = account.Id, token = query["token"].ToString() })).StatusCode);
+        app.Clock.Advance(TimeSpan.FromMinutes(5));
+        Assert.Equal(HttpStatusCode.BadRequest, (await browser.Post("verify-email-code", new { account.Email, code = app.Mail.LastCode })).StatusCode);
         using (var scope = app.Services.CreateScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -167,7 +196,7 @@ public sealed partial class AuthFlowTests
             Assert.True((await users.UpdateAsync(user)).Succeeded);
         }
         await browser.Post("forgot-password", new { account.Email });
-        var resetQuery = QueryHelpers.ParseQuery(new Uri(app.Mail.Links.Last()).Query);
+        var resetQuery = QueryHelpers.ParseQuery(app.Mail.LastResetLink.Query);
         await Task.Delay(2100);
         Assert.Equal(HttpStatusCode.BadRequest, (await browser.Post("reset-password", new { account.Email, token = resetQuery["token"].ToString(), Password, confirmPassword = Password })).StatusCode);
         await browser.Post("login", new { account.Email, Password });
@@ -187,8 +216,7 @@ public sealed partial class AuthFlowTests
     private static async Task<(Guid Id, string Email)> RegisterConfirmed(AuthApp app, Browser browser)
     {
         var account = await Register(app, browser);
-        var query = QueryHelpers.ParseQuery(new Uri(app.Mail.Links.Last()).Query);
-        Assert.Equal(HttpStatusCode.OK, (await browser.Post("confirm-email", new { userId = account.Id, token = query["token"].ToString() })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser.Post("verify-email-code", new { account.Email, code = app.Mail.LastCode })).StatusCode);
         return account;
     }
     private static async Task<string> Token(HttpResponseMessage response)
@@ -199,14 +227,29 @@ public sealed partial class AuthFlowTests
     private sealed class CaptureMail : IAuthEmailSender
     {
         public bool Fails { get; set; }
-        public ConcurrentQueue<string> Links { get; } = new();
-        public Task SendAsync(string email, string subject, string link, CancellationToken cancellationToken = default)
+        public ConcurrentQueue<string> Messages { get; } = new();
+        public string LastCode {
+            get {
+                var match = System.Text.RegularExpressions.Regex.Match(Messages.Last(), @"(?m)^Mã xác nhận của bạn: ([0-9]{6})$");
+                Assert.True(match.Success, "Expected six digits in the confirmation email.");
+                return match.Groups[1].Value;
+            }
+        }
+        public Uri LastResetLink => new(Messages.Last().Split('\n').Last());
+        public Task SendAsync(string email, string subject, string body, CancellationToken cancellationToken = default)
         { if (Fails) throw new AuthEmailDeliveryException(new System.Net.Mail.SmtpException("Test transport failure"));
-            Links.Enqueue(link); return Task.CompletedTask; }
+            Messages.Enqueue(body); return Task.CompletedTask; }
+    }
+    private sealed class TestClock : TimeProvider
+    {
+        private TimeSpan offset;
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UtcNow + offset;
+        public void Advance(TimeSpan delta) => offset += delta;
     }
     private sealed class AuthApp : WebApplicationFactory<Program>
     {
         public CaptureMail Mail { get; } = new();
+        public TestClock Clock { get; } = new();
         private readonly bool _shortEmailLifetime;
         public AuthApp(bool shortEmailLifetime = false) => _shortEmailLifetime = shortEmailLifetime;
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -219,6 +262,7 @@ public sealed partial class AuthFlowTests
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IAuthEmailSender>(); services.AddSingleton<IAuthEmailSender>(Mail);
+                services.RemoveAll<TimeProvider>(); services.AddSingleton<TimeProvider>(Clock);
                 if (_shortEmailLifetime) services.PostConfigure<DataProtectionTokenProviderOptions>(o => o.TokenLifespan = TimeSpan.FromSeconds(1));
             });
         }

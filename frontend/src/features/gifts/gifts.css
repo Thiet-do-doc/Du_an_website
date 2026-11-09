@@ -1,0 +1,35 @@
+.gifts-page > header em { font: italic 1.15em/1.1 Georgia, serif; }
+.gifts-page fieldset { border: 0; padding: 0; min-width: 0; }
+.gift-option { cursor: pointer; position: relative; display: grid; gap: 6px; background: #fffdfc; border: 1px solid #ebd7df; border-radius: 18px; padding: 13px 13px 20px; color: #755b66; }
+.gift-option:has(:checked) { border-color: #ad4770; box-shadow: 0 0 0 1px #ad4770; }
+.gift-option input { position: absolute; top: 23px; right: 23px; z-index: 1; accent-color: #a03660; width: 17px; height: 17px; }
+.gift-option strong { margin: 8px 6px 0; color: #52313f; font-size: 18px; }
+.gift-option > span:last-child { margin: 0 6px; font-size: 13px; }
+.gift-stamp { display: grid; place-items: center; position: relative; border-radius: 11px; padding: 17px; background: #f8e9ee; color: #93596f; }
+.theme-letter .gift-stamp { background: #f8eee1; color: #966b51; }
+.theme-bear .gift-stamp { background: #f0ebf3; color: #876b93; }
+.gift-stamp small, .gift-stamp b { position: absolute; left: 12px; font: 700 9px/1.2 'Segoe UI', sans-serif; letter-spacing: .15em; }
+.gift-stamp small { top: 12px; } .gift-stamp b { bottom: 12px; }
+.gift-art { width: 104px; height: 104px; display: block; }
+.gift-dispatch, .gift-history header, .gift-history li { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.gift-dispatch { align-items: flex-end; }
+.gift-dispatch label { flex: 1 1 200px; display: grid; gap: 7px; font-size: 14px; font-weight: 600; }
+.gift-dispatch select { background: #fffbfc; padding: 12px; border: 1px solid #ddc3ce; border-radius: 9px; min-width: 0; color: #4f3642; }
+.gift-history { margin-top: 18px; }
+.gift-history header { justify-content: space-between; margin-bottom: 15px; }
+.gift-history h2 { font-size: 20px; margin: 0; }
+.gift-history ul { list-style: none; padding: 0; }
+.gift-history li { border-top: 1px solid #f4e5ec; padding: 9px 0; gap: 9px; }
+.gift-history .gift-art { width: 46px; height: 46px; }
+.gift-history strong, .gift-history small { display: block; }
+.gift-history time { margin-left: auto; font-size: 12px; color: #826b75; }
+.bubble .gift-art { margin: auto; width: 78px; height: 78px; background: #fff3f5; border-radius: 12px; }
+@media (max-width: 800px) {
+  .gift-option { grid-template-columns: 96px 1fr; align-content: center; padding: 8px 36px 8px 8px; column-gap: 12px; }
+  .gift-stamp { grid-row: span 2; padding: 8px; }
+  .gift-stamp small, .gift-stamp b { font-size: 7px; left: 6px; }
+  .gift-stamp .gift-art { width: 68px; height: 68px; }
+  .gift-option strong { align-self: end; margin: 0; }
+  .gift-option > span:last-child { margin: 0; }
+  .gift-option input { right: 12px; top: 12px; }
+}

@@ -35,6 +35,15 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("ConfirmationCodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ConfirmationCodeFailures")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("ConfirmationCodeHash")
+                        .HasColumnType("bytea");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -141,7 +150,10 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ConversationId")
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConversationId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -160,6 +172,10 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
 
                     b.Property<Guid>("TargetId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -195,6 +211,10 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
 
                     b.Property<Guid>("ConversationId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("GiftCode")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
 
                     b.Property<Guid>("SenderId")
                         .HasColumnType("uuid");
@@ -318,6 +338,29 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.CommentReaction", b =>
+                {
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.HasKey("CommentId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CommentReactions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommentReactions_Kind", "\"Kind\" IN ('like', 'haha', 'angry', 'sad')");
+                        });
+                });
+
             modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.Post", b =>
                 {
                     b.Property<Guid>("Id")
@@ -335,6 +378,17 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Feeling")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<byte[]>("PhotoContent")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("PhotoType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
@@ -342,6 +396,55 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.HasIndex("CreatedAtUtc", "Id");
 
                     b.ToTable("Posts", (string)null);
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.PostComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PostId", "CreatedAtUtc", "Id");
+
+                    b.ToTable("PostComments", (string)null);
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.PostLike", b =>
+                {
+                    b.Property<Guid>("PostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PostId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PostLikes", (string)null);
                 });
 
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Interest", b =>
@@ -777,8 +880,7 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.HasOne("DatingApp.Api.Modules.ChatNotifications.Entities.Conversation", null)
                         .WithMany()
                         .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
                         .WithMany()
@@ -880,6 +982,21 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                     b.Navigation("ToUser");
                 });
 
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.CommentReaction", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Posts.Entities.PostComment", null)
+                        .WithMany("Reactions")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.Post", b =>
                 {
                     b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", "Author")
@@ -889,6 +1006,41 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Author");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.PostComment", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Posts.Entities.PostComment", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("DatingApp.Api.Modules.Posts.Entities.Post", null)
+                        .WithMany("Comments")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.PostLike", b =>
+                {
+                    b.HasOne("DatingApp.Api.Modules.Posts.Entities.Post", null)
+                        .WithMany("Likes")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DatingApp.Api.Modules.Auth.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Photo", b =>
@@ -996,6 +1148,18 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.Post", b =>
+                {
+                    b.Navigation("Comments");
+
+                    b.Navigation("Likes");
+                });
+
+            modelBuilder.Entity("DatingApp.Api.Modules.Posts.Entities.PostComment", b =>
+                {
+                    b.Navigation("Reactions");
                 });
 
             modelBuilder.Entity("DatingApp.Api.Modules.Profiles.Entities.Interest", b =>

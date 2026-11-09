@@ -9,8 +9,8 @@ export async function api<T>(path: string, _token: string, options: RequestInit 
   return authenticatedFetch<T>(path, { ...options, headers });
 }
 
-export const getConversations = (token: string) =>
-  api<ConversationPage>('/api/v1/conversations?page=1&pageSize=50', token);
+export const getConversations = (token: string, page = 1) =>
+  api<ConversationPage>(`/api/v1/conversations?page=${page}&pageSize=50`, token);
 
 export const getMessages = (token: string, conversationId: string,
   opts: { cursor?: string | null; afterId?: string | null } = {}) => {

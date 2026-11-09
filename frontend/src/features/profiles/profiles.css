@@ -17,3 +17,17 @@
 .photo-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:13px; margin-top:20px; }.photo-item { position:relative; min-width:0; }.photo-item img { width:100%; aspect-ratio:4/5; object-fit:cover; background:#edf0eb; border-radius:10px; }.photo-placeholder { aspect-ratio:4/5; max-width:240px; border-radius:10px; background:linear-gradient(145deg,#edf0eb,#dce8df); color:#527465; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }.photo-placeholder span { display:grid; place-items:center; width:66px; height:66px; border-radius:50%; background:#fff9; font-size:30px; }.photo-placeholder p { padding:0 14px; font-size:13px; }.avatar-label { position:absolute; top:8px; left:8px; border-radius:16px; padding:5px 8px; color:white; background:#172d3bcc; font-size:11px; }.photo-actions { display:flex; flex-wrap:wrap; gap:5px; padding-top:8px; }.photo-actions button { border:1px solid #d8ded5; background:white; border-radius:6px; padding:6px 8px; color:#315e50; font-size:12px; }.photo-actions button:disabled { opacity:.5; }.photo-empty { color:#65756c; }
 .profile-page :focus-visible { outline:3px solid #447265; outline-offset:3px; }
 @media(max-width:600px) { .profile-page { margin-top:20px; }.profile-heading { flex-direction:column; }.profile-card { padding:19px; }.profile-fields { grid-template-columns:1fr; gap:0; }.photo-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.profile-section-head { align-items:flex-start; flex-direction:column; } }
+.member-profile { max-width: 760px; margin-inline: auto; }
+.member-profile > .ml-card { margin-top: 1rem; }
+.member-profile-head { display: flex; align-items: center; gap: 1rem; }
+.member-profile-head h1 { font-size: clamp(1.4rem,5vw,2rem); overflow-wrap: anywhere; }
+.member-portrait { width: 5.5rem; height: 5.5rem; flex: none; object-fit: cover; border-radius: 50%; }
+.member-portrait.initials { display: grid; place-items: center; font-size: 2rem; color: #843659; background: #ffe7ef; }
+.member-bio { margin: 1rem 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.member-profile h2, .received-likes h2 { font-size: 1.15rem; margin-top: 1.3rem; }
+.member-interests { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; }
+.member-interests li { border-radius: 1rem; background: #fcecf1; padding: .3rem .75rem; }
+.member-connect, .received-likes { background: #fff5f8; border-radius: 1rem; padding: 1rem; margin: 1rem 0; }
+.received-likes ul { padding-left: 1.25rem; }
+.received-likes li + li { margin-top: .5rem; }
+.member-safety { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #f0dfe5; }

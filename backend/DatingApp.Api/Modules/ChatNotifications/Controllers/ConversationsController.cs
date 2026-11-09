@@ -12,6 +12,18 @@ namespace DatingApp.Api.Modules.ChatNotifications.Controllers;
 public sealed class ConversationsController(ChatService service, IChatPermissions permissions,
     ICurrentUser currentUser) : ControllerBase
 {
+    [HttpGet("/api/v1/gifts")]
+    public IActionResult Gifts() => Ok(DatingApp.Api.Modules.ChatNotifications.DTOs.GiftCatalog.Items);
+
+    [HttpGet("{id:guid}/gifts")]
+    public async Task<IActionResult> RecentGifts(Guid id, CancellationToken ct)
+    {
+        if (currentUser.UserId is not Guid userId) return Unauthorized();
+        try { return Ok(await service.RecentGiftsAsync(id, userId, ct)); }
+        catch (ChatDependencyUnavailableException e) { return Problem(statusCode: 503, title: e.Message); }
+        catch (ChatDomainException e) { return Problem(statusCode: e.StatusCode, title: e.Message); }
+    }
+
     [HttpGet]
     public async Task<IActionResult> Index([FromQuery] int page = 1,
         [FromQuery] int pageSize = 20, CancellationToken ct = default)

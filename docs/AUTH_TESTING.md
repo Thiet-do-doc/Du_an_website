@@ -38,10 +38,10 @@ dotnet user-secrets set "Jwt:Key" ([Convert]::ToBase64String($bytes)) --project 
 
 1. Mở `/register`: email, mật khẩu, nhập lại mật khẩu, ngày sinh đủ 18 tuổi.
 2. Development lưu email `.eml` vào `.artifacts/mail` ở gốc repository, không gửi
-   tới hộp thư bên ngoài. Mở `.eml` bằng ứng dụng email để lấy liên kết xác nhận.
+   tới hộp thư bên ngoài. Mở `.eml` bằng ứng dụng email để lấy mã 6 chữ số.
    Nếu email gửi thất bại, tài khoản vẫn tồn tại; dùng `/resend-confirmation`.
-3. Mở liên kết `/confirm-email?...`, bấm xác nhận. Liên kết sống 1 giờ và dùng một lần.
-4. Mở `/login`. Tài khoản chưa xác nhận hoặc bị khóa không đăng nhập được.
+3. Sau khi đăng ký, nhập mã tại `/verify-email`. Mã có hiệu lực 5 phút, dùng một lần và cho phép tối đa 5 lần thử sai. Sau 60 giây có thể gửi lại mã. Mã mới thay thế mã cũ.
+4. Xác nhận thành công đưa người dùng vào trang chủ với phiên đăng nhập mới. Lần sau đăng nhập bằng mật khẩu tại `/login`.
 5. Mở `/account`, tải lại trang: AuthProvider khôi phục phiên bằng refresh cookie.
 6. `/forgot-password` gửi liên kết `/reset-password?...`. Reset thành công thu hồi
    mọi phiên của tài khoản; token reset cũ không sử dụng lại được.
@@ -54,7 +54,7 @@ Nếu không có ứng dụng mở `.eml`, đọc nội dung email mới nhất 
 powershell -File scripts/Read-DevMail.ps1
 ```
 
-Lệnh chỉ đọc mailbox local và in liên kết. Không chia sẻ liên kết xác nhận/reset.
+Với bản Docker demo, chạy `powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File ".\scripts\DockerDemo.ps1" mail` để xem mã trong thư mới nhất. Email đặt lại mật khẩu vẫn chứa liên kết.
 
 Không lưu access/refresh token vào localStorage. Access token sống 10 phút trong
 bộ nhớ; refresh cookie HttpOnly sống tối đa 7 ngày cho một phiên, không kéo dài
@@ -66,17 +66,17 @@ Web Locks có thể phải đăng nhập lại khi hai tab cùng refresh một t
 ## API và Postman
 
 Import `docs/Auth.postman_collection.json`. Đặt `baseUrl`, `email`, `password`.
-Collection tự lấy CSRF token cho login/refresh/logout và lưu JWT sau login/refresh.
+Collection tự lấy CSRF token cho verify-email-code/login/refresh/logout và lưu JWT khi tạo hoặc gia hạn phiên.
 Postman Cookie Jar phải bật. Không thêm Bearer header cho các endpoint cookie;
-chỉ thêm cho `/me` và `/admin-check`. Liên kết email chứa `userId`, `token` hoặc
-`email`, `token`; điền token đó vào biến collection để thử confirm/reset.
+chỉ thêm cho `/me` và `/admin-check`. Điền mã từ thư vào `confirmationCode`; khi thử reset, điền token từ liên kết vào `resetToken`.
 
 | Method | Endpoint /api/v1/auth/ | Body / điều kiện |
 |---|---|---|
 | GET | csrf | Trả request token; lưu cookie CSRF |
 | POST | register | email, password, confirmPassword, dateOfBirth |
 | POST | resend-confirmation | email; phản hồi chung tránh lộ tài khoản |
-| POST | confirm-email | userId (UUID), token từ email |
+| POST | verify-email-code | email, code (chuỗi 6 chữ số), CSRF token + cookie; trả phiên như login |
+| POST | confirm-email | Chỉ xử lý liên kết cũ đã phát, còn hiệu lực và chưa yêu cầu mã mới |
 | POST | login | email, password; X-CSRF-TOKEN + cookie CSRF |
 | POST | refresh | Body rỗng; X-CSRF-TOKEN + cookie CSRF/refresh |
 | POST | logout | Như refresh; 204 và xóa cookie |
@@ -121,6 +121,14 @@ Repo hiện chưa có ChatHub hoặc API SafetyAdmin thật. Hợp đồng/filte
 nhưng nghiệm thu chat–khóa xuyên module chờ TV4/TV5 triển khai module của họ.
 
 ## Cấp Admin và production
+
+Khi chạy local, sau bước migration, khởi tạo tài khoản quản trị từ thư mục gốc bằng lệnh riêng:
+
+```powershell
+dotnet run --project backend/DatingApp.Api --launch-profile http -- --init-admin
+```
+
+Lệnh chỉ chạy trong Development. Lần đầu, terminal hiển thị email `admin@mylove.test` và mật khẩu ngẫu nhiên một lần. Lưu mật khẩu, chạy website như thường lệ, đăng nhập tại `/login` rồi mở **Tài khoản → Quản lý báo cáo** (`/admin`) để duyệt báo cáo. Chạy lại lệnh với cùng database sẽ giữ nguyên mật khẩu và quyền hiện tại. Nếu email đã thuộc về tài khoản thường, lệnh dừng.
 
 Không có trường role trong Register và không có endpoint tự nâng quyền.
 Chủ vận hành chạy lệnh có kiểm soát cho tài khoản đã xác nhận và đang hoạt động:

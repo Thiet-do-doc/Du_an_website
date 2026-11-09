@@ -1,0 +1,101 @@
+.welcome-mist {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 58% 48%, #fff3f5ed, #f8d4e2ec 57%, #f3c2d5ed);
+  animation: mist-reveal 2.35s ease-in-out both;
+}
+.mist-cloud, .mist-cloud::before, .mist-cloud::after {
+  position: absolute;
+  inset: -15%;
+  content: "";
+  background: radial-gradient(ellipse at 23% 52%, #fff9fa 3%, transparent 39%),
+    radial-gradient(ellipse at 64% 51%, #ebaac7ae 4%, transparent 42%),
+    radial-gradient(ellipse at 75% 20%, #fff5f2 4%, transparent 44%);
+  filter: blur(18px);
+  animation: mist-drift 2.5s ease-out both;
+}
+.mist-cloud::before { transform: rotate(24deg); opacity: .65; animation-direction: reverse; }
+.mist-cloud::after { inset: -35% 0 5%; opacity: .55; animation-direction: alternate-reverse; }
+.mist-greeting { position: relative; text-align: center; color: #823753; animation: welcome-float 1.8s ease-in-out infinite; }
+.mist-greeting span { display: block; font-size: clamp(17px, 2vw, 24px); }
+.mist-greeting strong { display: block; font: italic 600 clamp(58px, 11vw, 118px)/1.1 Georgia, serif; letter-spacing: -.065em; }
+.mist-greeting i { color: #ce7295; }
+@keyframes mist-reveal { 0%, 44% { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+@keyframes mist-drift { from { transform: translate(-5%, 3%) scale(.97); } to { transform: translate(6%, -3%) scale(1.14); } }
+@keyframes welcome-float { 50% { transform: translateY(-5px); } }
+.welcome-story h1 { animation: welcome-float 4.6s ease-in-out 2; }
+.polaroid img { width: 100%; height: 100%; position: absolute; inset: 0; object-fit: cover; object-position: center 38%; }
+.polaroid-0 img { object-position: center 62%; }
+.welcome-form .auth-glass {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fffdfedc, #fff0f5bc);
+  border-color: #efd3df;
+  backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px white, 0 18px 64px #95426112;
+}
+.auth-glass::before {
+  content: "mylove.";
+  position: absolute;
+  z-index: -1;
+  right: -.09em;
+  top: 13%;
+  font: italic bold clamp(75px, 11vw, 150px)/1 Georgia, serif;
+  letter-spacing: -.08em;
+  color: #aa315b0c;
+  pointer-events: none;
+  transform: rotate(-13deg);
+}
+.auth-tabs { position: relative; isolation: isolate; background: #f5dee7; gap: 0; }
+.auth-tabs::before {
+  content: "";
+  position: absolute;
+  inset: 5px auto 5px 5px;
+  width: calc(50% - 5px);
+  border-radius: 9px;
+  background: #fffafc;
+  box-shadow: 0 2px 9px #98446224;
+  transition: transform .36s cubic-bezier(.22,.75,.24,1);
+  z-index: -1;
+}
+.auth-tabs.mode-register::before { transform: translateX(100%); }
+.auth-tabs a[aria-current] { background: transparent; box-shadow: none; }
+.auth-sheet.sheet-login, .page-back { --slide-start: -26px; }
+.auth-sheet.sheet-register, .page-next { --slide-start: 26px; }
+.auth-sheet, .member-content { animation: slide-in .36s cubic-bezier(.2,.74,.25,1) both; }
+@keyframes slide-in { from { opacity: .25; transform: translateX(var(--slide-start, 12px)); } to { opacity: 1; transform: none; } }
+.member-app { overflow-x: clip; }
+.member-nav { position: relative; isolation: isolate; min-width: 0; }
+.member-nav a { position: relative; transition: color .25s; }
+.member-nav a[aria-current] { background: transparent; }
+.tab-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--tab-width);
+  height: var(--tab-height);
+  transform: translateX(var(--tab-x));
+  background: linear-gradient(140deg, #fbe1eb, #fff1f6);
+  border: 1px solid #f2d0de;
+  border-radius: 14px;
+  pointer-events: none;
+  z-index: -1;
+  transition: transform .4s cubic-bezier(.22,.74,.26,1), width .35s;
+}
+.nav-icon { flex-shrink: 0; }
+.icon-tint { fill: currentColor; fill-opacity: .09; }
+.member-nav a[aria-current] .icon-tint { fill-opacity: .19; }
+.dot-orbit { color: #b74d76; animation: orbit 2s linear infinite; }
+.empty-state:not([role="status"]) .dot-orbit { animation-duration: 6s; }
+@keyframes orbit { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .welcome-mist { display: none; }
+  .mist-cloud, .mist-greeting, .welcome-story h1, .auth-sheet, .member-content, .dot-orbit { animation: none; }
+  .tab-highlight, .auth-tabs::before { transition: none; }
+}

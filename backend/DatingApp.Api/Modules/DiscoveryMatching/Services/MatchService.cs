@@ -3,6 +3,7 @@ using DatingApp.Api.Modules.DiscoveryMatching.DTOs;
 using DatingApp.Api.Modules.DiscoveryMatching.Entities;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using DatingApp.Api.Modules.ChatNotifications.Entities;
 
 namespace DatingApp.Api.Modules.DiscoveryMatching.Services;
 
@@ -31,7 +32,13 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
                 }
 
                 if (!await db.UserLikes.AnyAsync(x => x.FromUserId == fromUserId && x.ToUserId == toUserId, cancellationToken))
+                {
                     db.UserLikes.Add(new UserLike { FromUserId = fromUserId, ToUserId = toUserId, CreatedAt = clock.GetUtcNow().UtcDateTime });
+                    var name = await db.Profiles.Where(p => p.UserId == fromUserId).Select(p => p.DisplayName).SingleOrDefaultAsync(cancellationToken) ?? "Một thành viên";
+                    db.Notifications.Add(new AppNotification { RecipientId = toUserId, ActorId = fromUserId,
+                        Type = "profileLike", TargetId = fromUserId, Text = name + " đã thích bạn.",
+                        DedupeKey = $"profileLike:{Guid.NewGuid():N}" });
+                }
                 await db.Passes.Where(x => x.FromUserId == fromUserId && x.ToUserId == toUserId).ExecuteDeleteAsync(cancellationToken);
 
                 var mutualLike = await db.UserLikes.AnyAsync(x => x.FromUserId == toUserId && x.ToUserId == fromUserId, cancellationToken);
@@ -98,6 +105,26 @@ public sealed class MatchService(AppDbContext db, IMatchConversationBridge conve
             if (!await db.Passes.AnyAsync(x => x.FromUserId == fromUserId && x.ToUserId == toUserId, cancellationToken)) throw;
         }
     }
+
+    public async Task<ProfileConnection> GetConnectionAsync(Guid viewer, Guid other, CancellationToken ct)
+    {
+        if (viewer == other) return new("self");
+        var match = await FindPairAsync(viewer, other, ct);
+        if (match is not null)
+        {
+            if (match.UnmatchedAt is not null) return new("unmatched");
+            var ids = await conversations.GetConversationIdsAsync([match.Id], ct);
+            return new("matched", ids[match.Id]);
+        }
+        var like = await db.UserLikes.Where(x => x.FromUserId == viewer && x.ToUserId == other ||
+                x.FromUserId == other && x.ToUserId == viewer)
+            .Select(x => x.FromUserId == viewer ? "sent" : "received").FirstOrDefaultAsync(ct);
+        return new(like ?? "none");
+    }
+
+    public Task<List<Guid>> GetReceivedLikeIdsAsync(Guid viewer, CancellationToken ct) =>
+        db.UserLikes.Where(x => x.ToUserId == viewer).OrderByDescending(x => x.CreatedAt)
+            .Select(x => x.FromUserId).ToListAsync(ct);
 
     public async Task<IReadOnlyList<MatchResponse>> GetMatchesAsync(Guid userId, CancellationToken cancellationToken)
     {

@@ -42,8 +42,7 @@ public sealed class AccountAccess(AppDbContext db, UserManager<ApplicationUser> 
         // Quyền luôn lấy lại từ DB: hạ quyền có hiệu lực ngay với JWT cũ.
         var identity = (ClaimsIdentity)principal.Identity!;
         foreach (var claim in identity.FindAll(ClaimTypes.Role).ToArray()) identity.RemoveClaim(claim);
-        identity.AddClaim(new Claim(ClaimTypes.Role, "User"));
-        foreach (var role in await users.GetRolesAsync(user)) identity.AddClaim(new Claim(ClaimTypes.Role, role));
+        identity.AddClaim(new Claim(ClaimTypes.Role, await users.IsInRoleAsync(user, "Admin") ? "Admin" : "User"));
         return true;
     }
     public async Task<bool> SetActiveAsync(Guid userId, bool active, CancellationToken cancellationToken = default)

@@ -21,7 +21,7 @@
                          "value":  ""
                      },
                      {
-                         "key":  "confirmationToken",
+                         "key":  "confirmationCode",
                          "value":  ""
                      },
                      {
@@ -37,7 +37,7 @@
                   {
                       "script":  {
                                      "exec":  [
-                                                  "if ([\u0027Login\u0027, \u0027Refresh\u0027, \u0027Logout\u0027].includes(pm.info.requestName)) {",
+                                                  "if ([\u0027Verify email code\u0027, \u0027Login\u0027, \u0027Refresh\u0027, \u0027Logout\u0027].includes(pm.info.requestName)) {",
                                                   "  pm.sendRequest(pm.variables.get(\u0027baseUrl\u0027) + \u0027/api/v1/auth/csrf\u0027, (error, response) =\u003e {",
                                                   "    if (error || response.code !== 200) throw new Error(\u0027Cannot obtain CSRF token\u0027);",
                                                   "    pm.request.headers.upsert({ key: \u0027X-CSRF-TOKEN\u0027, value: response.json().token });",
@@ -53,7 +53,7 @@
                                      "exec":  [
                                                   "if (pm.response.code === 200) {",
                                                   "  const body = pm.response.json();",
-                                                  "  if (body.token \u0026\u0026 [\u0027Login\u0027, \u0027Refresh\u0027].includes(pm.info.requestName)) pm.collectionVariables.set(\u0027token\u0027, body.token);",
+                                                  "  if (body.token \u0026\u0026 [\u0027Verify email code\u0027, \u0027Login\u0027, \u0027Refresh\u0027].includes(pm.info.requestName)) pm.collectionVariables.set(\u0027token\u0027, body.token);",
                                                   "  if (body.userId \u0026\u0026 pm.info.requestName === \u0027Register\u0027) pm.collectionVariables.set(\u0027userId\u0027, body.userId);",
                                                   "}",
                                                   "if (pm.info.requestName === \u0027Logout\u0027 \u0026\u0026 pm.response.code === 204) pm.collectionVariables.set(\u0027token\u0027, \u0027\u0027);"
@@ -64,7 +64,7 @@
                   }
               ],
     "info":  {
-                 "description":  "Local Auth flows. Enable cookie jar. Copy confirmation/reset tokens from the development mailbox.",
+                 "description":  "Local Auth flows. Enable cookie jar. Copy the confirmation code or password reset token from the development mailbox.",
                  "name":  "DatingApp Auth",
                  "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
              },
@@ -157,10 +157,10 @@
                                  }
                  },
                  {
-                     "name":  "Confirm email",
+                     "name":  "Verify email code",
                      "request":  {
                                      "body":  {
-                                                  "raw":  "{\r\n    \"userId\":  \"{{userId}}\",\r\n    \"token\":  \"{{confirmationToken}}\"\r\n}",
+                                                  "raw":  "{\r\n    \"email\":  \"{{email}}\",\r\n    \"code\":  \"{{confirmationCode}}\"\r\n}",
                                                   "options":  {
                                                                   "raw":  {
                                                                               "language":  "json"
@@ -173,12 +173,12 @@
                                                  "host":  [
                                                               "{{baseUrl}}"
                                                           ],
-                                                 "raw":  "{{baseUrl}}/api/v1/auth/confirm-email",
+                                                 "raw":  "{{baseUrl}}/api/v1/auth/verify-email-code",
                                                  "path":  [
                                                               "api",
                                                               "v1",
                                                               "auth",
-                                                              "confirm-email"
+                                                              "verify-email-code"
                                                           ]
                                              },
                                      "header":  [

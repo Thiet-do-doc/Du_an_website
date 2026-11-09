@@ -13,6 +13,7 @@ public sealed class DiscoveryMatchingAuthorizationTests(WebApplicationFactory<Pr
     [InlineData("POST", "/api/v1/user-likes/89f6f148-f81c-4d0c-8a20-0f2f905825bd")]
     [InlineData("POST", "/api/v1/passes/89f6f148-f81c-4d0c-8a20-0f2f905825bd")]
     [InlineData("GET", "/api/v1/matches")]
+    [InlineData("GET", "/api/v1/user-likes/received")]
     [InlineData("DELETE", "/api/v1/matches/89f6f148-f81c-4d0c-8a20-0f2f905825bd")]
     public async Task Anonymous_requests_are_rejected_before_services_are_resolved(string method, string path)
     {

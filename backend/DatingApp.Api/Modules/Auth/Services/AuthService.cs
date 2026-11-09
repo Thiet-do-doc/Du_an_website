@@ -2,6 +2,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
 using DatingApp.Api.Infrastructure.Data;
 using DatingApp.Api.Modules.Auth.DTOs;
 using DatingApp.Api.Modules.Auth.Entities;
@@ -13,8 +14,11 @@ using Npgsql;
 namespace DatingApp.Api.Modules.Auth.Services;
 public sealed record AuthSession(LoginResponse Response, string RefreshToken, DateTimeOffset RefreshExpiresAt);
 public sealed class AuthService(UserManager<ApplicationUser> users, AppDbContext db, JwtSettings jwt,
-    IAuthEmailSender emailSender, IConfiguration configuration, AuthConnectionRegistry connections)
+    IAuthEmailSender emailSender, IConfiguration configuration, AuthConnectionRegistry connections, TimeProvider clock)
 {
+    private static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ResendDelay = TimeSpan.FromMinutes(1);
+    private const int MaxCodeFailures = 5;
     public async Task<(IdentityResult Result, Guid? UserId)> RegisterAsync(RegisterRequest request)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -30,19 +34,64 @@ public sealed class AuthService(UserManager<ApplicationUser> users, AppDbContext
             { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "UserNameIndex" })
         { db.ChangeTracker.Clear(); return (Error("DuplicateEmail", "Email này đã được sử dụng."), null); }
         if (!result.Succeeded) return (result, null);
-        await SendConfirmationAsync(user);
+        await SendConfirmationCodeAsync(user.Id);
         return (result, user.Id);
     }
     public async Task SendConfirmationAsync(string email)
     {
         var user = await users.FindByEmailAsync(email.Trim());
-        if (user is not null && user.IsActive && !user.EmailConfirmed) await SendConfirmationAsync(user);
+        if (user is not null) await SendConfirmationCodeAsync(user.Id);
     }
-    private async Task SendConfirmationAsync(ApplicationUser user)
+    private byte[] CodeHash(ApplicationUser user, string code) =>
+        HMACSHA256.HashData(jwt.SigningKey.Key, Encoding.UTF8.GetBytes($"email-confirm-v1:{user.Id:N}:{user.NormalizedEmail}:{code}"));
+
+    private async Task SendConfirmationCodeAsync(Guid id)
     {
-        var token = Encode(await users.GenerateEmailConfirmationTokenAsync(user));
-        await emailSender.SendAsync(user.Email!, "Xác nhận email DatingApp",
-            Link("confirm-email", new Dictionary<string, string?> { ["userId"] = user.Id.ToString(), ["token"] = token }));
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var user = await LockUserAsync(id);
+        if (user is null || !user.IsActive || user.EmailConfirmed || await users.IsLockedOutAsync(user)) return;
+        var now = clock.GetUtcNow();
+        if (user.ConfirmationCodeExpiresAt > now + CodeLifetime - ResendDelay) return;
+        string code;
+        byte[] hash;
+        do
+        {
+            code = RandomNumberGenerator.GetInt32(1_000_000).ToString("D6", CultureInfo.InvariantCulture);
+            hash = CodeHash(user, code);
+        } while (user.ConfirmationCodeHash is { } previous && CryptographicOperations.FixedTimeEquals(hash, previous));
+        user.ConfirmationCodeHash = hash;
+        user.ConfirmationCodeExpiresAt = now + CodeLifetime;
+        user.ConfirmationCodeFailures = 0;
+        await db.SaveChangesAsync();
+        await emailSender.SendAsync(user.Email!, "Mã xác nhận email mylove",
+            $"Mã xác nhận của bạn: {code}\n\nMã có hiệu lực trong 5 phút. Nếu bạn không đăng ký mylove, hãy bỏ qua email này.");
+        await transaction.CommitAsync();
+    }
+
+    public async Task<AuthSession?> VerifyEmailCodeAsync(VerifyEmailCodeRequest request)
+    {
+        var found = await users.FindByEmailAsync(request.Email.Trim());
+        if (found is null) return null;
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var user = await LockUserAsync(found.Id);
+        if (user is null || !user.IsActive || user.EmailConfirmed || await users.IsLockedOutAsync(user)
+            || user.ConfirmationCodeHash is not { } hash || user.ConfirmationCodeExpiresAt is not { } expiry
+            || expiry <= clock.GetUtcNow() || user.ConfirmationCodeFailures >= MaxCodeFailures) return null;
+        if (!CryptographicOperations.FixedTimeEquals(hash, CodeHash(user, request.Code)))
+        {
+            user.ConfirmationCodeFailures++;
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return null;
+        }
+        user.EmailConfirmed = true;
+        user.ConfirmationCodeHash = null;
+        user.ConfirmationCodeExpiresAt = null;
+        user.ConfirmationCodeFailures = 0;
+        var session = await IssueAsync(user, Guid.NewGuid(), clock.GetUtcNow().AddDays(7));
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return session;
     }
     public async Task<IdentityResult> ConfirmEmailAsync(ConfirmEmailRequest request)
     {
@@ -50,7 +99,7 @@ public sealed class AuthService(UserManager<ApplicationUser> users, AppDbContext
         if (decoded is null) return Error("InvalidToken", "Liên kết không hợp lệ hoặc đã hết hạn.");
         await using var transaction = await db.Database.BeginTransactionAsync();
         var user = await LockUserAsync(request.UserId);
-        if (user is null || !user.IsActive || user.EmailConfirmed) return Error("InvalidToken", "Liên kết không hợp lệ hoặc đã sử dụng.");
+        if (user is null || !user.IsActive || user.EmailConfirmed || user.ConfirmationCodeHash is not null) return Error("InvalidToken", "Liên kết không hợp lệ hoặc đã sử dụng.");
         var result = await users.ConfirmEmailAsync(user, decoded);
         if (result.Succeeded) await transaction.CommitAsync();
         return result;
@@ -61,6 +110,7 @@ public sealed class AuthService(UserManager<ApplicationUser> users, AppDbContext
         if (user is null || !user.EmailConfirmed || !user.IsActive) return;
         var token = Encode(await users.GeneratePasswordResetTokenAsync(user));
         await emailSender.SendAsync(user.Email!, "Đặt lại mật khẩu DatingApp",
+            "Mở liên kết sau để đặt lại mật khẩu. Nếu không yêu cầu, hãy bỏ qua email này.\n\n" +
             Link("reset-password", new Dictionary<string, string?> { ["email"] = user.Email, ["token"] = token }));
     }
     public async Task<IdentityResult> ResetPasswordAsync(ResetPasswordRequest request)
@@ -155,8 +205,7 @@ public sealed class AuthService(UserManager<ApplicationUser> users, AppDbContext
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), new("sid", sessionId.ToString()),
             new("security_stamp", user.SecurityStamp!)
         };
-        claims.Add(new Claim(ClaimTypes.Role, "User"));
-        foreach (var role in await users.GetRolesAsync(user)) claims.Add(new Claim(ClaimTypes.Role, role));
+        claims.Add(new Claim(ClaimTypes.Role, await users.IsInRoleAsync(user, "Admin") ? "Admin" : "User"));
         var token = new JwtSecurityToken(jwt.Issuer, jwt.Audience, claims, expires: expiresAt,
             signingCredentials: new SigningCredentials(jwt.SigningKey, SecurityAlgorithms.HmacSha256));
         return new AuthSession(new LoginResponse { Token = new JwtSecurityTokenHandler().WriteToken(token),

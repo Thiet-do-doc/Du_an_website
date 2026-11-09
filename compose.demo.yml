@@ -1,0 +1,13 @@
+# Local override for compose.staging.yml. The database and keys use project-scoped volumes.
+services:
+  api:
+    image: mylove-api:demo
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Email__Delivery: Pickup
+    volumes:
+      - ./.artifacts/docker-demo/mail:/.artifacts/mail
+  web:
+    image: mylove-web:demo
+    volumes:
+      - ./frontend/public/images:/usr/share/nginx/html/images:ro

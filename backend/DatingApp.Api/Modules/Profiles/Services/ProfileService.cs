@@ -167,6 +167,9 @@ public sealed class ProfileService(AppDbContext db, TimeProvider timeProvider) :
             && x.User.DateOfBirth <= today.AddYears(-18)
             && x.UserInterests.Any());
 
+    public Task<bool> CanAppearInDiscoveryAsync(Guid userId, CancellationToken ct) =>
+        EligibleProfiles(BusinessDate()).AnyAsync(p => p.UserId == userId, ct);
+
     private async Task<IReadOnlyList<ProfileSummary>> ToSummariesAsync(IReadOnlyCollection<ProfileSummaryRow> rows,
         CancellationToken cancellationToken)
     {

@@ -21,6 +21,7 @@ public sealed class ChatMessage
     public Guid SenderId { get; set; }
     public Guid ClientMessageId { get; set; }
     public string Content { get; set; } = string.Empty;
+    public string? GiftCode { get; set; }
     public DateTimeOffset SentAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -28,8 +29,10 @@ public sealed class AppNotification
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid RecipientId { get; set; }
-    public Guid ConversationId { get; set; }
-    // "match" or "newMessage". TargetId is the MatchId or persisted MessageId respectively.
+    public Guid? ConversationId { get; set; }
+    public Guid? ActorId { get; set; }
+    public string? Text { get; set; }
+    // Social events target a post or profile; chat events also carry ConversationId.
     public string Type { get; set; } = string.Empty;
     public Guid TargetId { get; set; }
     // Stable per-recipient event key makes duplicate publish/retry idempotent.
