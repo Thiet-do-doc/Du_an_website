@@ -114,6 +114,16 @@ Kết quả đã kiểm chứng ngày 10/11/2026: build #2 SUCCESS, **61/61 test
 
 Build #1 bị gián đoạn khi Docker restart. Ổ C lúc đó gần đầy; đã dọn cache build cũ, compact ổ ảo Docker và khởi động lại. File ổ ảo giảm từ khoảng 15,28 GB xuống 12,10 GB. Sau đó build #2 chạy thành công. Nếu gặp tình trạng tương tự, kiểm tra dung lượng ổ Windows thật; con số dung lượng ảo `df` trong container không phản ánh dung lượng vật lý còn lại trên máy.
 
+Build #3 bật `DEMO_TEST_FAILURE=true`: FAILURE, 72 test đạt và 1 test `LAB intentional failure` lỗi (`2 !== 3`), Package bị bỏ qua đúng thiết kế.
+
+Build #4 (Poll SCM phát hiện commit mới) bị Docker/Jenkins restart giữa stage Backend tests; tiến trình `dotnet test` mất, option `timeout(30 phút)` tự hủy build (ABORTED). Build #5 FAILURE ngay khi đọc Jenkinsfile: `object file .git/objects/... is empty`, `fetch-pack: invalid index-pack output`. Nguyên nhân là cache lightweight checkout trong `/var/jenkins_home/caches/git-*` bị ghi dở khi Docker dừng đột ngột (`git fsck` thấy 4 object rỗng); GitHub và repo local vẫn bình thường. Xử lý: xóa đúng thư mục cache đó, Jenkins tự tạo lại:
+
+```powershell
+docker exec mylove-jenkins-jenkins-1 sh -c "rm -rf /var/jenkins_home/caches/git-*"
+```
+
+Build #6 (`DEMO_TEST_FAILURE=false`) SUCCESS: toàn bộ 8 stage xanh, 72/72 test đạt (61 xUnit + 11 node:test), có artifacts. Báo cáo Word/PDF, log, JSON và ảnh chụp nằm trong `outputs/jenkins-lab/` (không commit).
+
 Cảnh báo MSTest về `temporary-junit-reports` và thiếu file coverage không làm thất bại build: báo cáo TRX đã được đọc. Bài lab chưa đo coverage. Thông báo Checks API không tìm thấy publisher nghĩa là chưa gửi GitHub Checks; kết quả vẫn được lưu trong Jenkins. Không đồng nhất các thông báo này với test thất bại.
 
 Cần trình bày: mục tiêu, dự án/URL GitHub, môi trường, kiến trúc, các lệnh đã chạy, plugin, Jenkinsfile, kết quả từng stage, số test pass/fail/skip, lỗi và cách khắc phục, kết luận. Phân biệt lần lỗi chủ động với lỗi phát sinh thật.
