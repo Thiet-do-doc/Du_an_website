@@ -1,6 +1,6 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS dotnet
-FROM node:24-bookworm-slim AS node
-FROM jenkins/jenkins:lts-jdk21
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:de4fe90a98845d75910b9769662465c84de1a934665c431279d1382b2bddc02b AS dotnet
+FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS node
+FROM jenkins/jenkins:lts-jdk21@sha256:74401de6a6f92e1afe1b02d1c8e3d0c33f263bfb5275dd8813f9150355f2367b
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libssl-dev zlib1g ca-certificates \
     && rm -rf /var/lib/apt/lists/*
