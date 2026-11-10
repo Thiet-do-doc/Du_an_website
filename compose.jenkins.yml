@@ -1,0 +1,38 @@
+name: mylove-jenkins
+services:
+  jenkins:
+    build: ./infra/jenkins
+    image: mylove-jenkins:lab
+    ports:
+      - "127.0.0.1:8081:8080"
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false -Xmx1024m
+      AUTH_TEST_CONNECTION: Host=postgres-test;Port=5432;Database=mylove_ci;Username=mylove_ci;Password=${JENKINS_TEST_DB_PASSWORD:?Run Initialize-JenkinsLab.ps1 first}
+    secrets:
+      - jenkins_admin_password
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    restart: unless-stopped
+  postgres-test:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: mylove_ci
+      POSTGRES_USER: mylove_ci
+      POSTGRES_PASSWORD: ${JENKINS_TEST_DB_PASSWORD:?Run Initialize-JenkinsLab.ps1 first}
+    # Disposable CI data; never connect this service to the application's database.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mylove_ci -d mylove_ci"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+secrets:
+  jenkins_admin_password:
+    file: ./.artifacts/jenkins/admin-password.txt
+volumes:
+  jenkins_home:
