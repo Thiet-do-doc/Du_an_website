@@ -110,6 +110,12 @@ Kết quả cần quan sát: Frontend tests FAILURE, có test `LAB intentional f
 
 ## 7. Thu thập bằng chứng và báo cáo
 
+Kết quả đã kiểm chứng ngày 10/11/2026: build #2 SUCCESS, **61/61 test backend và 11/11 test frontend đạt**, không có test bỏ qua; đã lưu `backend.tar.gz` và `frontend.tar.gz`. Môi trường trong container: Jenkins 2.580.2, .NET SDK 10.0.403, Node v24.22.2, npm 11.19.1.
+
+Build #1 bị gián đoạn khi Docker restart. Ổ C lúc đó gần đầy; đã dọn cache build cũ, compact ổ ảo Docker và khởi động lại. File ổ ảo giảm từ khoảng 15,28 GB xuống 12,10 GB. Sau đó build #2 chạy thành công. Nếu gặp tình trạng tương tự, kiểm tra dung lượng ổ Windows thật; con số dung lượng ảo `df` trong container không phản ánh dung lượng vật lý còn lại trên máy.
+
+Cảnh báo MSTest về `temporary-junit-reports` và thiếu file coverage không làm thất bại build: báo cáo TRX đã được đọc. Bài lab chưa đo coverage. Thông báo Checks API không tìm thấy publisher nghĩa là chưa gửi GitHub Checks; kết quả vẫn được lưu trong Jenkins. Không đồng nhất các thông báo này với test thất bại.
+
 Cần trình bày: mục tiêu, dự án/URL GitHub, môi trường, kiến trúc, các lệnh đã chạy, plugin, Jenkinsfile, kết quả từng stage, số test pass/fail/skip, lỗi và cách khắc phục, kết luận. Phân biệt lần lỗi chủ động với lỗi phát sinh thật.
 
 Ảnh nên chụp: `docker compose ps`; Manage Jenkins → Plugins → Installed; cấu hình Pipeline from SCM; lịch sử build; stage view của build thành công; test report; build lỗi minh họa và lần chạy lại thành công. Che thông tin đăng nhập. Kèm link source và file log đã kiểm tra không chứa bí mật.
