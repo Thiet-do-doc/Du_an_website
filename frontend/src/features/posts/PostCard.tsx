@@ -3,6 +3,7 @@ import { authenticatedFetch } from '../auth/api';
 import { blockUser } from '../safety-admin/api/blocks';
 import { CommentThread } from './CommentThread';
 import { PrivatePhoto } from '../profiles/PrivatePhoto';
+import { NavIcon } from '../../app/NavIcon';
 
 export type Post = {
   id: string; authorId: string; authorName: string; content: string; createdAtUtc: string; isMine: boolean;
@@ -58,16 +59,16 @@ export function PostCard({ post, onChange, onDelete, onBlockAuthor, deleting }: 
         <time dateTime={post.createdAtUtc}>{date(post.createdAtUtc)}</time></div>
       {post.isMine && <button type="button" className="post-delete" disabled={deleting} onClick={onDelete}>Xóa bài</button>}
     </header>
-    {post.feeling && <p className="post-feeling">Đang cảm thấy {post.feeling.toLocaleLowerCase('vi')}</p>}
+    {post.feeling && <p className="post-feeling"><NavIcon name="smile" />Đang cảm thấy {post.feeling.toLocaleLowerCase('vi')}</p>}
     {post.content && <p className="post-body">{post.content}</p>}
     {post.hasPhoto && <PrivatePhoto className="post-image" src={path + '/photo'} alt={'Ảnh trong bài của ' + post.authorName} />}
     <div className="post-actions">
       <button type="button" aria-pressed={post.isLiked} disabled={busy} onClick={() => void run(toggleLike)}>
-        {post.isLiked ? '♥ Đã thích' : '♡ Thích'} · {post.likeCount}</button>
+        <NavIcon name="heart" />{post.isLiked ? 'Đã thích' : 'Thích'} · {post.likeCount}</button>
       <button type="button" aria-expanded={open} disabled={busy} onClick={() => {
         setOpen(!open);
-      }}>Bình luận · {post.commentCount}</button>
-      <button type="button" onClick={() => void share()}>Chia sẻ ↗</button>
+      }}><NavIcon name="chat" />Bình luận · {post.commentCount}</button>
+      <button type="button" onClick={() => void share()}><NavIcon name="share" />Chia sẻ</button>
     </div>
     {shareNotice && <p role="status">{shareNotice}</p>}
     {copyLink && <label>Liên kết bài viết<input readOnly value={link} onFocus={e => e.target.select()} /></label>}

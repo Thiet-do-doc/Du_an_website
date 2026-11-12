@@ -42,7 +42,6 @@ export default function AdminReports() {
   }, [page, status, revision]);
 
   return <section className="safety-panel" aria-labelledby="admin-reports-heading">
-    <p className="eyebrow">QUẢN TRỊ KIỂM DUYỆT</p>
     <h1 id="admin-reports-heading">Quản lý báo cáo</h1>
     <p>Xem xét báo cáo vi phạm từ người dùng, kiểm tra bằng chứng và xử lý tài khoản vi phạm.</p>
     <div className="safety-grid admin-reports-grid">

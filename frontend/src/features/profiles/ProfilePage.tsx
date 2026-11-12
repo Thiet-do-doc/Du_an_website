@@ -62,13 +62,14 @@ function ProfileEditor() {
   }
   if (loading) return <p role="status">Đang tải hồ sơ…</p>;
   return <div className="profile-page">
-    <div className="profile-heading"><div><p className="eyebrow">HỒ SƠ CỦA BẠN</p><h1>Hãy để câu chuyện của bạn bắt đầu.</h1>
+    <div className="profile-heading"><div><h1>Hồ sơ của tôi</h1>
       <p className="profile-lead">Hoàn thiện hồ sơ để mọi người hiểu thêm về bạn. Ngày sinh và email không hiển thị công khai.</p></div>
       {profile?.isComplete && <span className="profile-badge">Hồ sơ hoàn thiện</span>}</div>
     {profile && !profile.isComplete && <p className="profile-notice" role="status">Chào mừng bạn! Hãy lưu tên hiển thị và chọn ít nhất một sở thích để bắt đầu sử dụng mylove.</p>}
     {profile?.isComplete && <a className="btn btn-outline-dark" href="/">Tiếp tục đến trang chủ</a>}
     {error && <p className="profile-alert" role="alert">{error}</p>}{notice && <p className="profile-notice" role="status">{notice}</p>}
-    <form className="profile-card" onSubmit={submit}>
+    <div className="profile-editor-layout">
+    <form className="profile-card profile-editor-form" onSubmit={submit}>
       <h2>Giới thiệu</h2>
       <label>Tên hiển thị<input required maxLength={60} value={name} onChange={e => setName(e.target.value)} /></label>
       <label>Giới thiệu<textarea maxLength={500} rows={4} value={bio} onChange={e => setBio(e.target.value)} placeholder="Một vài điều bạn muốn chia sẻ…" /><small>{bio.length}/500</small></label>
@@ -79,17 +80,18 @@ function ProfileEditor() {
       <label className="discoverable"><input type="checkbox" checked={discoverable} onChange={e => setDiscoverable(e.target.checked)} />Cho phép hồ sơ xuất hiện trong khám phá</label>
       <button className="btn btn-dark" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu hồ sơ'}</button>
     </form>
-    <section className="profile-card" aria-labelledby="photos-heading"><div className="profile-section-head"><div><h2 id="photos-heading">Ảnh của bạn</h2><p>Tối đa 6 ảnh · JPEG, PNG hoặc WebP · tối đa 5 MB mỗi ảnh</p></div>
+    <section className="profile-card profile-editor-photos" aria-labelledby="photos-heading"><div className="profile-section-head"><div><h2 id="photos-heading">Ảnh của bạn</h2><p>Tối đa 6 ảnh · JPEG, PNG hoặc WebP · tối đa 5 MB mỗi ảnh</p></div>
       <label className="btn btn-outline-dark upload-label">{busy ? 'Đang xử lý…' : 'Thêm ảnh'}<input type="file" accept={photoTypes} onChange={upload} disabled={busy || (profile?.photos.length ?? 0) >= 6} /></label></div>
       {pendingPhoto && <p role="status">Đã chọn {pendingPhoto.name}. Điền tên hiển thị và bấm <strong>Lưu hồ sơ</strong> để tải ảnh này lên.
         {' '}<button type="button" disabled={busy} onClick={() => setPendingPhoto(null)}>Bỏ chọn</button></p>}
       <div className="photo-grid">{profile?.photos.length ? [...profile.photos].sort((a, b) => a.sortOrder - b.sortOrder).map((photo, i) => <article className="photo-item" key={photo.id}>
-        <PrivatePhoto src={photo.url} alt={photo.isAvatar ? 'Ảnh đại diện' : `Ảnh hồ sơ ${i + 1}`} />{photo.isAvatar && <span className="avatar-label">Ảnh đại diện</span>}
+        <PrivatePhoto src={photo.url} alt={photo.isAvatar ? 'Ảnh đại diện' : `Ảnh hồ sơ ${i + 1}`} previewAvatar={photo.isAvatar} />
+        {photo.isAvatar && <span className="avatar-label">Ảnh đại diện</span>}
         <div className="photo-actions"><button type="button" onClick={() => void run(() => setAvatar(photo.id), 'Đã chọn ảnh đại diện.')} disabled={busy || photo.isAvatar}>Chọn đại diện</button>
           <button type="button" onClick={() => void move(i, -1)} disabled={busy || i === 0} aria-label="Chuyển ảnh lên trước">↑</button>
           <button type="button" onClick={() => void move(i, 1)} disabled={busy || i === (profile.photos.length - 1)} aria-label="Chuyển ảnh xuống sau">↓</button>
           <button type="button" onClick={() => void run(() => deletePhoto(photo.id), 'Đã xóa ảnh.')}>Xóa</button></div></article>) : <div className="photo-placeholder" role="img" aria-label="Ảnh đại diện mặc định"><span aria-hidden="true">♥</span><p>Ảnh đại diện sẽ xuất hiện ở đây</p></div>}</div>
-    </section>
+    </section></div>
   </div>;
 }
 

@@ -3,6 +3,8 @@ import { ApiError, authenticatedFetch, publicPost } from './api';
 import { ProtectedRoute, useAuth } from './AuthProvider';
 import { EmailCodePage, startEmailVerification } from './EmailCodePage';
 import AdminReports from '../safety-admin/AdminReports';
+import { AccountAvatar } from '../profiles/AccountAvatar';
+import { AvatarPreview } from '../profiles/AvatarPreview';
 import { finishSignIn } from '../../app/WelcomeMist';
 export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'confirm-email' | 'resend-confirmation' | 'verify-email';
 type Mode = Exclude<AuthMode, 'verify-email'>;
@@ -49,7 +51,7 @@ function AuthForm({ mode }: { mode: Mode }) {
     return matching.flatMap(([, values]) => values).map((value, index) => <div className="text-danger small" key={index}>{value}</div>);
   }
   return <>
-    <span className="auth-heart" aria-hidden="true">♡</span><h1>{mode === 'login' ? 'Rất vui khi gặp bạn!' : titles[mode]}</h1>
+    <h1>{mode === 'login' ? 'Rất vui khi gặp bạn!' : titles[mode]}</h1>
     <p className="auth-intro">{mode === 'login' ? 'Đăng nhập để tiếp tục câu chuyện của bạn.' : mode === 'register' ? 'Chỉ vài thông tin nhỏ để bắt đầu kết nối.' : 'Một bước nhỏ để trở lại với những kết nối của bạn.'}</p><form onSubmit={submit}>
     {mode !== 'confirm-email' && <label>Email<input name="email" type="email" autoComplete="email" required maxLength={256}
       defaultValue={mode === 'reset-password' ? params.get('email') ?? '' : ''} />{errors('email')}</label>}
@@ -67,7 +69,9 @@ function AuthForm({ mode }: { mode: Mode }) {
   </form><nav className="auth-links">{mode !== 'login' && <a href="/login">Về đăng nhập</a>}{mode === 'login' && <a href="/register">Chưa có tài khoản? Đăng ký</a>}
     <a href="/resend-confirmation">Gửi lại mã xác nhận</a></nav></>;
 }
-function AccountContent() {
+type AccountIdentity = { avatar?: string; name?: string };
+
+function AccountContent({ avatar, name }: AccountIdentity) {
   const auth = useAuth();
   const [me, setMe] = useState<{ email: string; userId: string; roles: string[] }>();
   const [error, setError] = useState('');
@@ -78,12 +82,23 @@ function AccountContent() {
     try { await auth.logout(); location.assign('/login'); } catch { setError('Chưa đăng xuất được trên máy chủ. Hãy thử lại.'); }
     finally { setBusy(false); }
   }
-  return <section className="auth-panel"><h1>Tài khoản của bạn</h1>
-    {me ? <><p>{me.email}</p><p>Mã tài khoản: <code>{me.userId}</code></p>
+  return <section className="account-page"><h1>Tài khoản</h1><div className="ml-card">
+    <header className="account-identity">
+      {avatar ? <AvatarPreview source={avatar} name={name}>
+        <AccountAvatar source={avatar} />
+      </AvatarPreview> : <AccountAvatar />}
+      <div>
+        {name && <h2>{name}</h2>}
+        <p>{me?.email ?? auth.session?.user.email}</p>
+      </div>
+    </header>
+    {me ? <><p>Mã tài khoản: <code>{me.userId}</code></p>
       <p>Vai trò: {me.roles.length ? me.roles.join(', ') : 'Người dùng'}</p></> : <p role="status">Đang tải tài khoản…</p>}
     {error && <p role="alert">{error}</p>}
     <button className="btn btn-dark" disabled={busy} onClick={() => { void signOut(); }}>Đăng xuất</button>
-    <nav className="auth-links">{me?.roles.includes('Admin') && <a href="/admin">Quản lý báo cáo</a>}<a href="/">Về trang chủ</a></nav></section>;
+    <nav className="auth-links">{me?.roles.includes('Admin') && <a href="/admin">Quản lý báo cáo</a>}<a href="/">Về Bảng tin</a></nav></div></section>;
 }
-export function AccountPage() { return <ProtectedRoute><AccountContent /></ProtectedRoute>; }
+export function AccountPage(props: AccountIdentity) {
+  return <ProtectedRoute><AccountContent {...props} /></ProtectedRoute>;
+}
 export function AdminPage() { return <ProtectedRoute><AdminReports /></ProtectedRoute>; }

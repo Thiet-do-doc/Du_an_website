@@ -4,8 +4,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { getPublicProfile } from '../profiles/api';
 import { ReactionPicker, type Reaction } from './ReactionPicker';
 
-type Comment = { id: string; authorId: string; authorName: string; content: string; createdAtUtc: string;
-  parentId: string | null; replyCount: number; myReaction: Reaction | null; reactions: Record<Reaction, number> };
+type Comment = { id: string; authorId?: string; authorName: string; content: string; createdAtUtc: string;
+  parentId?: string | null; replyCount?: number; myReaction?: Reaction | null; reactions?: Record<Reaction, number> };
 const date = (value: string) => new Date(value).toLocaleString('vi-VN', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
 export function CommentThread({ postId, parentId, parentName, onChange, onAdded, depth = 0 }: {
@@ -73,6 +73,7 @@ function CommentItem({ item, path, postId, onChange, depth }: {
       await authenticatedFetch(path + '/' + item.id + '/reaction', { method: remove ? 'DELETE' : 'PUT',
         headers: { 'Content-Type': 'application/json' }, body: remove ? undefined : JSON.stringify({ kind }) });
       setComment(old => {
+        if (!old.reactions) return old;
         const counts = { ...old.reactions };
         if (old.myReaction) counts[old.myReaction] = Math.max(0, counts[old.myReaction] - 1);
         if (!remove) counts[kind]++;
@@ -82,6 +83,7 @@ function CommentItem({ item, path, postId, onChange, depth }: {
     finally { inFlight.current = false; setBusy(false); }
   }
   async function message() {
+    if (!item.authorId) return;
     setBusy(true); setError('');
     try {
       const profile = await getPublicProfile(item.authorId);
@@ -95,11 +97,11 @@ function CommentItem({ item, path, postId, onChange, depth }: {
   return <article className="comment-item">
     <div className="comment-content"><strong>{comment.authorName}</strong> <time dateTime={comment.createdAtUtc}>{date(comment.createdAtUtc)}</time><p>{comment.content}</p></div>
     <div className="comment-actions" aria-label="Tương tác bình luận">
-      <ReactionPicker value={comment.myReaction} counts={comment.reactions} disabled={busy} onSelect={kind => void react(kind)} />
-      <button aria-expanded={replyOpen} onClick={() => setReplyOpen(!replyOpen)}>Trả lời{comment.replyCount > 0 && ' · ' + comment.replyCount}</button>
-      {item.authorId !== session?.user.id && <><button disabled={busy} onClick={() => void message()}>Nhắn tin</button><a href={'/profile?user=' + item.authorId}>Hồ sơ</a></>}
+      {comment.reactions && <ReactionPicker value={comment.myReaction ?? null} counts={comment.reactions} disabled={busy} onSelect={kind => void react(kind)} />}
+      {typeof comment.replyCount === 'number' && <button aria-expanded={replyOpen} onClick={() => setReplyOpen(!replyOpen)}>Trả lời{comment.replyCount > 0 && ' · ' + comment.replyCount}</button>}
+      {item.authorId && item.authorId !== session?.user.id && <><button disabled={busy} onClick={() => void message()}>Nhắn tin</button><a href={'/profile?user=' + item.authorId}>Hồ sơ</a></>}
     </div>
     {error && <p role="alert">{error}</p>}
-    {replyOpen && <div style={{ marginLeft: depth < 2 ? 16 : 0 }}><CommentThread postId={postId} parentId={comment.id} parentName={comment.authorName} depth={depth + 1} onChange={onChange} onAdded={() => setComment(old => ({ ...old, replyCount: old.replyCount + 1 }))} /></div>}
+    {replyOpen && typeof comment.replyCount === 'number' && <div style={{ marginLeft: depth < 2 ? 16 : 0 }}><CommentThread postId={postId} parentId={comment.id} parentName={comment.authorName} depth={depth + 1} onChange={onChange} onAdded={() => setComment(old => ({ ...old, replyCount: (old.replyCount ?? 0) + 1 }))} /></div>}
   </article>;
 }

@@ -1,4 +1,4 @@
-import { authenticatedFetch } from '../auth/api';
+import { ApiError, authenticatedFetch } from '../auth/api';
 import { useAuth } from '../auth/AuthProvider';
 import BlockButton from './BlockButton';
 import { blockUser, getBlockedUsers } from './api/blocks';
@@ -27,6 +27,8 @@ export default function SafetyAdminPanel({ isAdmin = false }: { isAdmin?: boolea
   const [page, setPage] = useState(1);
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [historyUnavailable, setHistoryUnavailable] = useState(false);
+  const [historyError, setHistoryError] = useState('');
   const [version, setVersion] = useState(0);
 
   const [blocked, setBlocked] = useState<BlockedUser[]>([]);
@@ -52,13 +54,18 @@ export default function SafetyAdminPanel({ isAdmin = false }: { isAdmin?: boolea
   }, [loadBlocked]);
 
   useEffect(() => {
-    let active = true; setLoading(true); setError('');
+    if (historyUnavailable) return;
+    let active = true; setLoading(true); setHistoryError('');
     authenticatedFetch<{ items: Report[]; hasMore: boolean }>('/api/v1/reports/mine?page=' + page)
       .then(data => { if (active) { setReports(data.items); setMore(data.hasMore); } })
-      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Chưa tải được báo cáo.'); })
+      .catch(e => {
+        if (!active) return;
+        if (e instanceof ApiError && (e.status === 404 || e.status === 405)) setHistoryUnavailable(true);
+        else setHistoryError(e instanceof Error ? e.message : 'Chưa tải được báo cáo.');
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [page, version]);
+  }, [page, version, historyUnavailable]);
 
   async function submitReport(event: FormEvent) {
     event.preventDefault(); setBusy(true); setMessage(''); setError('');
@@ -95,7 +102,7 @@ export default function SafetyAdminPanel({ isAdmin = false }: { isAdmin?: boolea
   const isTargetBlocked = hasValidTargetUser && blocked.some(b => b.userId.toLowerCase() === requestedUser.toLowerCase());
 
   return <section className="safety-panel" aria-labelledby="safety-heading">
-    <p className="eyebrow">AN TOÀN CỘNG ĐỒNG</p><h1 id="safety-heading">Chặn &amp; Báo cáo</h1>
+    <h1 id="safety-heading">An toàn</h1>
     <p>Quản lý danh sách người dùng đã chặn và theo dõi những báo cáo bạn đã gửi đến nhóm kiểm duyệt.</p>
     {isAdmin && <div className="safety-actions"><a className="btn btn-outline-dark" href="/admin">Mở trang Quản lý báo cáo (Admin) ↗</a></div>}
     {message && <p className="safety-message profile-notice" role="status">{message}</p>}
@@ -160,7 +167,7 @@ export default function SafetyAdminPanel({ isAdmin = false }: { isAdmin?: boolea
           </div>
         </div>
         <div className="safety-actions"><button type="button" className="btn btn-dark" aria-expanded={showForm} onClick={() => setShowForm(!showForm)}>{showForm ? 'Đóng biểu mẫu' : 'Gửi báo cáo'}</button>
-          <button type="button" className="btn btn-outline-dark" disabled={loading} onClick={() => setVersion(x => x + 1)}>Tải lại</button></div>
+          {!historyUnavailable && <button type="button" className="btn btn-outline-dark" disabled={loading} onClick={() => setVersion(x => x + 1)}>Tải lại</button>}</div>
         {showForm && <form className="safety-inline-form" onSubmit={submitReport}>
           <h3>Gửi báo cáo</h3>
           <label>Đối tượng<select value={targetType} onChange={e => setTargetType(e.target.value)}><option value="User">Người dùng</option><option value="Message">Tin nhắn</option></select></label>
@@ -170,7 +177,9 @@ export default function SafetyAdminPanel({ isAdmin = false }: { isAdmin?: boolea
           <button className="btn btn-dark" disabled={busy}>{busy ? 'Đang gửi…' : 'Gửi báo cáo'}</button>
         </form>}
         {error && <p role="alert" className="safety-error">{error}</p>}
-        {loading ? <p role="status">Đang tải báo cáo…</p> : !error && <>
+        {historyError && <p role="alert" className="safety-error">{historyError}</p>}
+        {historyUnavailable && <p className="safety-note">Lịch sử báo cáo hiện chưa khả dụng.</p>}
+        {!historyUnavailable && (loading ? <p role="status">Đang tải báo cáo…</p> : !historyError && <>
           {!reports.length && <p className="safety-note">Bạn chưa có báo cáo nào trên trang này.</p>}
           <ul className="report-list">{reports.map(report => <li className="report-card" key={report.id}><strong>{report.reason}</strong><p>{report.description}</p>
             <small>{statuses[report.status]} · {new Date(report.createdAtUtc).toLocaleString('vi-VN')}</small></li>)}</ul>
@@ -179,7 +188,7 @@ export default function SafetyAdminPanel({ isAdmin = false }: { isAdmin?: boolea
             <span>Trang {page}</span>
             <button type="button" className="btn btn-outline-dark" disabled={!more} onClick={() => setPage(x => x + 1)}>Trang sau</button>
           </nav>
-        </>}
+        </>)}
       </section>
     </div>
   </section>;

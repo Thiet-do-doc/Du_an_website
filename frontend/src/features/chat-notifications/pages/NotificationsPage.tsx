@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { authenticatedFetch } from '../../auth/api';
+import { ApiError, authenticatedFetch } from '../../auth/api';
 import { getNotifications, markRead } from '../api/chatApi';
 import type { ChatNotification } from '../types/chat';
 import './notifications.css';
@@ -18,9 +18,14 @@ export function NotificationBadge() {
   const [count, setCount] = useState(0);
   useEffect(() => {
     let active = true;
+    let supported = true;
     const update = () => {
+      if (!supported) return;
       void authenticatedFetch<{ count: number }>('/api/v1/notifications/unread-count')
-        .then(data => { if (active) setCount(data.count); }).catch(() => {});
+        .then(data => { if (active) setCount(data.count); })
+        .catch(error => {
+          if (error instanceof ApiError && (error.status === 404 || error.status === 405)) supported = false;
+        });
     };
     update();
     const timer = window.setInterval(update, 15000);
@@ -62,7 +67,7 @@ export default function NotificationsPage() {
   }
   const shown = items.filter(x => !unreadOnly || !x.readAt);
   return <section className="notification-page feature-page">
-    <header><p className="ml-kicker">NHỊP KẾT NỐI</p><h1>Thông báo</h1><p className="page-lead">Lượt thích, bài viết mới và những cuộc trò chuyện đang chờ bạn.</p></header>
+    <header><h1>Thông báo</h1><p className="page-lead">Các cập nhật về lượt thích, bài viết và ghép đôi.</p></header>
     <div className="notification-filters"><button aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)}>Tất cả</button>
       <button aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>Chưa đọc</button>
       <button disabled={busy} onClick={() => void load()}>Làm mới</button></div>

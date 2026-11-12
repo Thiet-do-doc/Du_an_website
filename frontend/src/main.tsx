@@ -6,6 +6,7 @@ import AppRouter from './app/AppRouter';
 import { AuthProvider } from './features/auth/AuthProvider';
 import './app/mylove.css';
 import './app/motion.css';
+import './app/interface.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode><AuthProvider><AppRouter /></AuthProvider></StrictMode>,
