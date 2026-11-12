@@ -62,7 +62,7 @@ export default function NotificationsPage() {
   }
   const shown = items.filter(x => !unreadOnly || !x.readAt);
   return <section className="notification-page feature-page">
-    <header><p className="ml-kicker">NHỊP KẾT NỐI</p><h1>Thông báo</h1><p className="page-lead">Lượt thích, bài viết mới và những cuộc trò chuyện đang chờ bạn.</p></header>
+    <header><h1>Thông báo</h1><p className="page-lead">Các cập nhật về lượt thích, bài viết và ghép đôi.</p></header>
     <div className="notification-filters"><button aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)}>Tất cả</button>
       <button aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>Chưa đọc</button>
       <button disabled={busy} onClick={() => void load()}>Làm mới</button></div>

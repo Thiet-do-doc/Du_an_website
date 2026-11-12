@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ApiError, authenticatedFetch } from '../auth/api';
 import { photoTypes, prepareUpload } from '../../shared/uploadImage';
 import { PostCard, type Post } from './PostCard';
+import { NavIcon } from '../../app/NavIcon';
+import { AccountAvatar } from '../profiles/AccountAvatar';
 import './posts.css';
 type Feed = { items: Post[]; hasMore: boolean };
-export default function FeedPage() {
+export default function FeedPage({ avatar }: { avatar?: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [content, setContent] = useState('');
   const [feeling, setFeeling] = useState('');
@@ -61,30 +63,33 @@ export default function FeedPage() {
     catch { setError('Chưa xóa được bài viết. Hãy thử lại.'); }
     finally { setBusy(false); }
   }
-  return <div className="feed-layout"><section>
-    <div className="feed-hero"><p className="ml-kicker">GÓC NHỎ CỦA CHÚNG MÌNH</p><h1>Hôm nay bạn thế nào?</h1><p>Một câu chuyện nhỏ cũng có thể là khởi đầu của một kết nối thật đẹp.</p></div>
+  return <section className="feed-page">
+    <header className="workspace-intro"><h1>{sharedId ? 'Bài viết' : 'Bảng tin'}</h1>
+      {!sharedId && <p>Những cập nhật mới từ cộng đồng mylove.</p>}</header>
+    <div className={sharedId ? 'feed-layout shared-feed' : 'feed-layout'}><div className="feed-stream">
     {sharedId ? <a className="text-link" href="/">← Về bảng tin</a> :
       <form className="ml-card feed-composer" onSubmit={submit}>
-        <h2>Chia sẻ một chút về ngày của bạn</h2>
-        <label className="visually-hidden" htmlFor="post-content">Nội dung bài viết</label>
-        <textarea id="post-content" maxLength={2000} value={content} disabled={busy}
-          onChange={e => setContent(e.target.value)} placeholder="Một niềm vui, một điều bạn yêu thích…" />
+        <div className="feed-composer-body">
+          <AccountAvatar source={avatar} />
+          <label className="visually-hidden" htmlFor="post-content">Nội dung bài viết</label>
+          <textarea id="post-content" maxLength={2000} value={content} disabled={busy}
+            onChange={e => setContent(e.target.value)} placeholder="Bạn muốn chia sẻ điều gì?" />
+        </div>
         <div className="composer-tools">
-          <label>Thêm ảnh<input type="file" accept={photoTypes} disabled={busy}
+          <label className="feed-tool feed-photo-tool"><NavIcon name="camera" />Ảnh<input type="file" className="visually-hidden" aria-label="Thêm ảnh" accept={photoTypes} disabled={busy}
             onChange={e => { const file = e.target.files?.[0]; if (file) setPhoto(file); e.target.value = ''; }} /></label>
-          <label>Cảm xúc<select value={feeling} disabled={busy} onChange={e => setFeeling(e.target.value)}>
-            <option value="">Chọn cảm xúc</option>
+          <label className="feed-tool"><NavIcon name="smile" /><select aria-label="Cảm xúc" value={feeling} disabled={busy} onChange={e => setFeeling(e.target.value)}>
+            <option value="">Cảm xúc</option>
             {['Vui vẻ','Hạnh phúc','Biết ơn','Hào hứng','Buồn','Bình yên'].map(f => <option key={f}>{f}</option>)}
           </select></label>
         </div>
         {photo && <div className="composer-preview">{preview && <img src={preview} alt="Ảnh đã chọn" />}
           <span>{photo.name}</span><button type="button" disabled={busy} onClick={() => setPhoto(null)}>Bỏ ảnh</button></div>}
         <div className="composer-bottom"><small>Bài viết hiển thị với các thành viên mylove.<br />{content.length}/2000 ký tự</small>
-          <button className="btn btn-dark" disabled={busy || !canPost}>{busy ? 'Đang đăng…' : 'Đăng bài ↗'}</button></div>
+          <button className="btn btn-dark" disabled={busy || !canPost}>{busy ? 'Đang đăng…' : 'Đăng bài'}</button></div>
       </form>}
     {error && <div className="feed-error" role="alert">{error} <button className="btn btn-sm" onClick={refreshFeed} disabled={loading}>Thử lại</button></div>}
     {notice && <p className="text-success small" role="status">{notice}</p>}
-    <div className="feed-title"><h2>Bảng tin</h2><span>Mới nhất</span></div>
     {posts.map(post => <PostCard key={post.id} post={post} deleting={busy}
       onChange={next => setPosts(list => list.map(p => p.id === next.id ? next : p))}
       onBlockAuthor={(authorId, authorName) => {
@@ -93,7 +98,11 @@ export default function FeedPage() {
       }}
       onDelete={() => void remove(post.id)} />)}
     {loading && <p role="status">Đang tải những câu chuyện mới…</p>}
-    {!loading && !error && !posts.length && <div className="ml-card feed-empty"><span aria-hidden="true">♡</span><h2>Một trang mới, một câu chuyện mới.</h2><p>Chưa có bài viết nào để hiển thị. Chia sẻ điều đầu tiên của bạn nhé!</p></div>}
+    {!loading && !error && !posts.length && <div className="ml-card feed-empty"><h2>Chưa có bài viết</h2><p>Bạn có thể chia sẻ bài viết đầu tiên từ ô đăng bài.</p></div>}
     {hasMore && <button className="btn btn-outline-secondary feed-load" disabled={loading} onClick={() => setPage(p => p + 1)}>Xem thêm bài viết</button>}
-  </section><aside className="feed-sidebar"><div className="ml-card"><div className="side-art" aria-hidden="true">✦</div><h2>Để mọi người hiểu bạn hơn</h2><p>Một tấm ảnh, đôi dòng giới thiệu và những điều bạn yêu thích.</p><a className="text-link" href="/profile">Hoàn thiện hồ sơ ↗</a></div><div className="ml-card"><p className="ml-kicker">CÓ THỂ BẠN SẼ GẶP</p><h2>Một người cùng tần số</h2><p>Ghé Khám phá và bắt đầu bằng một lời thích.</p><a className="text-link" href="/discover">Khám phá ngay ↗</a></div><div className="ml-card"><span className="soon-pill">Quà ảo miễn phí</span><h2>Trao một chút yêu thương</h2><p>Mở hội thoại và chọn nút quà tặng bên cạnh ô nhập tin nhắn.</p><a className="text-link" href="/chat">Tặng quà trong trò chuyện ↗</a></div></aside></div>;
+    </div>{!sharedId && <aside className="feed-sidebar">
+      <section className="ml-card"><h2>Hồ sơ của bạn</h2><p>Chỉnh sửa lời giới thiệu, ảnh và sở thích.</p><a className="text-link" href="/profile">Chỉnh sửa hồ sơ →</a></section>
+      <section className="ml-card"><h2>Khám phá thành viên</h2><p>Xem hồ sơ theo khu vực và sở thích.</p><a className="text-link" href="/discover">Mở Khám phá →</a></section>
+    </aside>}</div>
+  </section>;
 }

@@ -33,6 +33,6 @@ export default function TV4DemoPage() {
       <p>Mở thêm một cửa sổ ẩn danh để thử đồng thời hai tài khoản.</p>
       <p>Tài khoản C chưa match với A/B và không được đọc hội thoại này.</p></div>
       : <ChatPage key={session.alias} token={session.token}
-        userId={session.userId} displayName={session.displayName} />}
+        userId={session.userId} />}
   </>;
 }

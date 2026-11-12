@@ -8,6 +8,13 @@ const shapes = {
   profile: <><circle className="icon-tint" cx="12" cy="7.4" r="4.2"/><path className="icon-tint" d="M4.4 20.6v-1.7c0-3.5 3.3-5.7 7.6-5.7s7.6 2.2 7.6 5.7v1.7Z"/></>,
   shield: <><path className="icon-tint" d="M12 2.6c2.5 1.9 5.9 3.1 8.3 3.4v5.4c0 4.8-3.4 8.2-8.3 10.3-4.9-2.1-8.3-5.5-8.3-10.3V6c2.4-.3 5.8-1.5 8.3-3.4Z"/><path d="m8.4 11.9 2.5 2.5 4.8-5.1"/></>,
   report: <><rect className="icon-tint" x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6v-2H9v2ZM9 10h6M9 14h4"/></>,
+  menu: <path d="M4 6h16M4 12h16M4 18h16"/>,
+  lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></>,
+  location: <><path d="M20 10c0 5-8 11-8 11s-8-6-8-11a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></>,
+  heart: <path d="M20.8 4.6a5.2 5.2 0 0 0-7.4 0L12 6l-1.4-1.4a5.2 5.2 0 0 0-7.4 7.4L12 21l8.8-9a5.2 5.2 0 0 0 0-7.4Z"/>,
+  camera: <><path d="M8 5l2-2h4l2 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/></>,
+  smile: <><circle cx="12" cy="12" r="9"/><path d="M8 14a4 4 0 0 0 8 0M9 9h.01M15 9h.01"/></>,
+  share: <path d="m13 5 8 7-8 7v-5c-5 0-8 1-10 5 0-6 3-10 10-10Z"/>,
 };
 export function NavIcon({ name }: { name: keyof typeof shapes }) {
   return <svg className="nav-icon" viewBox="0 0 24 24" width="23" height="23" aria-hidden="true"

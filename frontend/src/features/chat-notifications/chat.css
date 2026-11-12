@@ -62,6 +62,8 @@ h2 { margin: 0; font-size: 15px; }
 .feedback button { border: 0; background: transparent; color: inherit; }
 .empty { padding: 8px; color: #778e9b; font-size: 13px; line-height: 1.6; }
 .centered { text-align: center; padding: 60px 0; }
+.blocked-conversation { max-width: 460px; margin: 42px auto; padding: 16px; text-align: center; background: #fff8fb; border: 1px solid #ecd5df; border-radius: 10px; color: #71334b; }
+.blocked-conversation p { margin: 4px 0 0; font-size: 13px; }
 .older { margin: 0 auto 20px; display: block; border: 1px solid #afd4e0; border-radius: 20px; padding: 6px 12px; color: #1b738b; background: #fff; }
 .alert { margin: 0 auto 12px; padding: 12px 15px; background: #ffebe7; border: 1px solid #ffc3b2; border-radius: 10px; display: flex; justify-content: space-between; gap: 10px; max-width: 1280px; font-size: 13px; color: #953f2e; }
 .alert button { border: 0; background: transparent; }

@@ -25,7 +25,7 @@ function SignedInChat() {
 
   if (!session) return null;
   return <ChatPage token={session.token} userId={session.user.id}
-    displayName="Tài khoản của bạn" getAccessToken={getAccessToken} />;
+    getAccessToken={getAccessToken} />;
 }
 
 // Authenticated /chat route. The demo A/B/C selector is deliberately not routed through the real UI.

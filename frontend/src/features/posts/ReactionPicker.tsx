@@ -57,6 +57,12 @@ export function ReactionPicker({ value, counts, disabled, onSelect }: {
         if (open) { setOpen(false); return; }
         onSelect(value ?? 'like');
       }}><span aria-hidden="true">{selected[1]}</span> {selected[2]}</button>
+    <button type="button" className="reaction-expand" disabled={disabled} aria-label="Chọn cảm xúc"
+      aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? dialogId : undefined}
+      onClick={() => {
+        setOpen(!open);
+        if (!open) requestAnimationFrame(() => root.current?.querySelector<HTMLButtonElement>('.reaction-options button')?.focus());
+      }}>⌄</button>
     {total > 0 && <span className="reaction-summary" aria-label={choices.filter(([kind]) => counts[kind] > 0).map(([kind, , label]) => label + ': ' + counts[kind]).join(', ')}>
       <span aria-hidden="true">{choices.filter(([kind]) => counts[kind] > 0).map(([, emoji]) => emoji).join('')} {total}</span>
     </span>}

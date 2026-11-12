@@ -95,7 +95,7 @@ export default function SafetyAdminPanel({ isAdmin = false }: { isAdmin?: boolea
   const isTargetBlocked = hasValidTargetUser && blocked.some(b => b.userId.toLowerCase() === requestedUser.toLowerCase());
 
   return <section className="safety-panel" aria-labelledby="safety-heading">
-    <p className="eyebrow">AN TOÀN CỘNG ĐỒNG</p><h1 id="safety-heading">Chặn &amp; Báo cáo</h1>
+    <h1 id="safety-heading">An toàn</h1>
     <p>Quản lý danh sách người dùng đã chặn và theo dõi những báo cáo bạn đã gửi đến nhóm kiểm duyệt.</p>
     {isAdmin && <div className="safety-actions"><a className="btn btn-outline-dark" href="/admin">Mở trang Quản lý báo cáo (Admin) ↗</a></div>}
     {message && <p className="safety-message profile-notice" role="status">{message}</p>}

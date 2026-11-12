@@ -1,39 +1,35 @@
 import { useState } from 'react';
 import { AuthPage, type AuthMode } from '../features/auth/AuthPages';
 import { WelcomeMist } from './WelcomeMist';
+import { NavIcon } from './NavIcon';
 
 function Portrait({ index }: { index: number }) {
   const [available, setAvailable] = useState(true);
   return <div className={'polaroid polaroid-' + index}><div>
     {available ? <img src={'/images/member-' + (index + 1) + '.jpg'} alt={'Thành viên ' + (index + 1) + ' của mylove'} onError={() => setAvailable(false)} /> :
       <><b aria-hidden="true">{['M','Y','L','O','V'][index]}</b><span aria-hidden="true">♡</span></>}
-  </div><small>mylove · 0{index + 1}</small></div>;
+  </div></div>;
 }
 
 export function Brand() {
-  return <a className="ml-brand" href="/" aria-label="mylove · Trang chủ"><span aria-hidden="true">♡</span> mylove<span className="brand-dot">.</span></a>;
+  return <a className="ml-brand" href="/" aria-label="mylove · Trang chủ"><span className="brand-mark"><NavIcon name="heart" /></span><span>mylove<span className="brand-dot">.</span></span></a>;
 }
 export default function App({ mode = 'login' }: { mode?: AuthMode }) {
   return <div className="welcome-page">
     {(mode === 'login' || mode === 'register') && <WelcomeMist />}
-    <header className="welcome-header"><Brand /><span>Một lời chào. Một kết nối mới.</span></header>
+    <header className="welcome-header"><Brand /></header>
     <main className="welcome-layout">
       <section className="welcome-story">
-        <p className="ml-kicker">NƠI NHỮNG CÂU CHUYỆN BẮT ĐẦU</p>
-        <h1>Chào mừng bạn<br />đến với <em>mylove.</em></h1>
-        <p className="welcome-description">Một chút chân thành, một chút rung động.<br />Gặp người mới và viết nên câu chuyện của riêng bạn.</p>
-        <div className="team-banner">
+        <h2>Chào mừng bạn<br /> đến với <em>mylove.</em></h2>
+        <p className="welcome-description">Gặp người mới và chia sẻ những điều bạn yêu thích.</p>
+        <figure className="team-banner">
             <div className="team-placeholder" role="group" aria-label="Năm thành viên nhóm phát triển mylove">
-              <span className="banner-spark" aria-hidden="true">✦</span>
               <div className="team-polaroids">{[0, 1, 2, 3, 4].map(i => <Portrait key={i} index={i} />)}</div>
-              <span className="banner-heart" aria-hidden="true">♡</span>
             </div>
-          <div className="team-caption"><span>FROM OUR TEAM, WITH LOVE</span><p>Năm người bạn. Một nơi để kết nối.</p></div>
-        </div>
-        <div className="welcome-values"><span>♡ Kết nối chân thành</span><span>✦ Là chính mình</span><span>⌁ Chia sẻ mỗi ngày</span></div>
+          <figcaption className="team-caption">Nhóm phát triển mylove</figcaption>
+        </figure>
       </section>
-      <div className="welcome-form"><AuthPage mode={mode} /><p className="welcome-footnote">Những kết nối đẹp bắt đầu từ một lời chào.</p></div>
+      <div className="welcome-form"><AuthPage mode={mode} /></div>
     </main>
-    <footer className="welcome-footer"><span>mylove · Made with love</span><span>Dành cho những câu chuyện của chúng mình ♡</span></footer>
   </div>;
 }

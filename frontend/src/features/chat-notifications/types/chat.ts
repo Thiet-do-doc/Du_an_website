@@ -15,6 +15,7 @@ export type Conversation = {
   createdAt: string;
   lastMessage: Message | null;
   canSend: boolean;
+  blockedByPartner?: boolean;
 };
 export type MessagePage = {
   items: Message[];

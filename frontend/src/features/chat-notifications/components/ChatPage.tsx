@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { authenticatedFetch } from '../../auth/api';
+import { ApiError, authenticatedFetch } from '../../auth/api';
 import { blockUser } from '../../safety-admin/api/blocks';
 import '../../gifts/gifts.css';
 import { GiftArt } from '../../gifts/GiftArt';
@@ -7,8 +7,9 @@ import { HubConnection, HubConnectionBuilder, HubConnectionState,
   HttpTransportType, LogLevel } from '@microsoft/signalr';
 import { getConversations, getMessages, reportMessage } from '../api/chatApi';
 import type { Conversation, Delivery, Message } from '../types/chat';
+import { NavIcon } from '../../../app/NavIcon';
 
-type Props = { token: string; userId: string; displayName: string; getAccessToken?: () => Promise<string> };
+type Props = { token: string; userId: string; getAccessToken?: () => Promise<string> };
 type ConnectionStatus = 'Đang kết nối' | 'Đã kết nối' | 'Đang nối lại' | 'Mất kết nối';
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('vi-VN', {
@@ -20,9 +21,10 @@ const mergeById = (before: Message[], incoming: Message[]) => {
   return [...map.values()].sort((a, b) =>
     a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id));
 };
-export function ChatPage({ token, userId, displayName, getAccessToken }: Props) {
+export function ChatPage({ token, userId, getAccessToken }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [current, setCurrent] = useState<string | null>(() => new URLSearchParams(location.search).get('conversation'));
+  const [threadOpen, setThreadOpen] = useState(() => current !== null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [pending, setPending] = useState<Delivery[]>([]);
@@ -41,8 +43,15 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   const connectionRef = useRef<HubConnection | null>(null);
   const currentRef = useRef(current);
   const messagesRef = useRef(messages);
+  const refreshVersion = useRef(0);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => { currentRef.current = current; }, [current]);
+  const active = conversations.find(x => x.id === current);
+  const blockedByPartner = Boolean(active?.blockedByPartner);
+  const blockedRef = useRef(blockedByPartner);
+  useEffect(() => {
+    currentRef.current = current;
+    blockedRef.current = blockedByPartner;
+  }, [current, blockedByPartner]);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => {
     const pane = bottomRef.current?.parentElement;
@@ -50,6 +59,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   }, [messages.length]);
 
   const refreshList = useCallback(async () => {
+    const version = ++refreshVersion.current;
     const requested = new URLSearchParams(location.search).get('conversation');
     const wanted = currentRef.current || requested;
     let page = 1;
@@ -59,6 +69,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       data = await getConversations(token, ++page);
       items.push(...data.items);
     }
+    if (version !== refreshVersion.current) return;
     setConversations(items);
     setCurrent(prev => {
       const selected = prev || requested;
@@ -69,11 +80,11 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   }, [token]);
   const catchUp = useCallback(async () => {
     const id = currentRef.current;
-    if (!id) return;
+    if (!id || blockedRef.current) return;
     const latest = messagesRef.current.at(-1);
     if (!latest) {
       const page = await getMessages(token, id);
-      if (currentRef.current !== id) return;
+      if (currentRef.current !== id || blockedRef.current) return;
       setMessages(page.items);
       setPending(prev => prev.filter(p => !page.items.some(m => m.clientMessageId === p.clientMessageId)));
       setCursor(page.nextCursor);
@@ -82,7 +93,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
     let afterId: string | null = latest.id;
     for (let pageIndex = 0; afterId && pageIndex < 50; pageIndex++) {
       const page = await getMessages(token, id, { afterId });
-      if (currentRef.current !== id) return;
+      if (currentRef.current !== id || blockedRef.current) return;
       setMessages(old => mergeById(old, page.items));
       setPending(prev => prev.filter(p => !page.items.some(m => m.clientMessageId === p.clientMessageId)));
       afterId = page.nextAfterId;
@@ -94,22 +105,30 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
   }, [refreshList]);
 
   useEffect(() => {
-    if (!current) {
-      setMessages([]); setCursor(null); return;
+    setMessages([]); setPending([]); setCursor(null);
+    if (!current || blockedByPartner) {
+      setBusy(false);
+      return;
     }
     let cancelled = false;
-    setMessages([]); setPending([]); setCursor(null); setBusy(true);
+    setBusy(true);
     void getMessages(token, current).then(page => {
       if (!cancelled) { setMessages(page.items); setCursor(page.nextCursor); }
-    }).catch(e => { if (!cancelled) setError(String(e)); })
+    }).catch(e => {
+      if (cancelled) return;
+      if (e instanceof ApiError && e.status === 404) void refreshList().catch(() => {});
+      else setError(String(e));
+    })
       .finally(() => { if (!cancelled) setBusy(false); });
     // Rejoin on selection. A rejected join must NOT expose any messages.
     const con = connectionRef.current;
     if (con?.state === HubConnectionState.Connected) {
-      void con.invoke('JoinConversation', current).catch(e => setError(String(e)));
+      void con.invoke('JoinConversation', current).catch(() => {
+        if (!cancelled) void refreshList().catch(() => {});
+      });
     }
     return () => { cancelled = true; };
-  }, [current, token]);
+  }, [current, token, blockedByPartner, refreshList]);
 
   useEffect(() => {
     let disposed = false;
@@ -124,10 +143,12 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
 
     const joinSelected = async () => {
       const selected = currentRef.current;
-      if (selected) await conn.invoke('JoinConversation', selected);
+      if (selected && !blockedRef.current) await conn.invoke('JoinConversation', selected);
     };
     const synchronize = () => {
-      void catchUp().catch(e => setError(String(e)));
+      void catchUp().catch(e => {
+        if (!(e instanceof ApiError && e.status === 404)) setError(String(e));
+      });
       void refreshList().catch(() => {});
     };
     const requiresLogin = (cause: unknown) => {
@@ -161,12 +182,12 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       startAttempt = 0;
       setStatus('Đã kết nối');
       setError('');
-      try { await joinSelected(); } catch (e) { setError(String(e)); }
+      await joinSelected().catch(() => {});
       synchronize();
     };
 
     conn.on('MessageCreated', (item: Message) => {
-      if (item.conversationId === currentRef.current) {
+      if (item.conversationId === currentRef.current && !blockedRef.current) {
         setMessages(prev => mergeById(prev, [item]));
         setPending(prev => prev.filter(p => p.clientMessageId !== item.clientMessageId));
       }
@@ -179,12 +200,15 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       // Keep the conversation/history available, but refresh canSend from the current Match row.
       void refreshList().catch(e => setError(String(e)));
     });
+    const refreshAccess = () => { void refreshList().catch(() => {}); };
+    conn.on('ConversationAccessChanged', refreshAccess);
+    window.addEventListener('focus', refreshAccess);
     conn.onreconnecting(() => { if (!disposed) setStatus('Đang nối lại'); });
     conn.onreconnected(() => {
       if (disposed) return;
       setStatus('Đã kết nối');
       setError('');
-      void joinSelected().catch(e => setError(String(e)));
+      void joinSelected().catch(refreshAccess);
       synchronize();
     });
     conn.onclose(error => {
@@ -195,6 +219,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
     void startConnection();
     return () => {
       disposed = true;
+      window.removeEventListener('focus', refreshAccess);
       if (retryTimer !== null) window.clearTimeout(retryTimer);
       connectionRef.current = null;
       void conn.stop();
@@ -223,6 +248,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
     }
   };
   const retry = async (item: Delivery) => {
+    if (!active?.canSend) return;
     setPending(prev => prev.map(p => p.clientMessageId === item.clientMessageId ? { ...p, status: 'sending' as const } : p));
     try { await sendWithId(item.content, item.clientMessageId); }
     catch (e) {
@@ -258,7 +284,7 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       } else setError(message);
     }
   };
-  useEffect(() => { setGiftOpen(false); setGiftError(''); }, [current]);
+  useEffect(() => { setGiftOpen(false); setGiftError(''); }, [current, blockedByPartner]);
   async function openGifts() {
     if (giftOpen) { setGiftOpen(false); return; }
     setGiftOpen(true); setGiftError(''); setGiftLoading(true);
@@ -297,42 +323,46 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
       setFeedback(`Đã chặn ${target.partnerName}. Bạn có thể bỏ chặn trong mục An toàn.`);
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
   };
-  const active = conversations.find(x => x.id === current);
-
   return (
-    <main className="shell">
+    <section className="shell" aria-labelledby="chat-title">
       <header className="app-header">
-        <div><p className="eyebrow">KẾT NỐI CỦA BẠN</p>
-          <h1>Trung tâm trò chuyện</h1><span>Đăng nhập: <b>{displayName}</b></span></div>
+        <div><h1 id="chat-title">Trò chuyện</h1><p>Tin nhắn với những người bạn đã ghép đôi.</p></div>
         <div className="connection" aria-live="polite"><span className={status === 'Đã kết nối' ? 'dot ok' : 'dot'} /> {status}</div>
       </header>
       {error && <div role="alert" className="alert"><span>{error}</span>
         <button onClick={() => setError('')} aria-label="Đóng lỗi">✕</button></div>}
       {feedback && <div role="status" className="feedback"><span>{feedback}</span>
         <button onClick={() => setFeedback('')} aria-label="Đóng thông báo">✕</button></div>}
-      <div className="layout">
+      <div className={threadOpen && active ? 'layout thread-open' : 'layout'}>
         <aside className="conversations">
           <div className="section-heading"><h2>Hội thoại</h2><span>{conversations.length}</span></div>
           {conversations.length === 0 ? <p className="empty">Chưa có hội thoại. Match hai chiều sẽ tạo chat.</p>
             : conversations.map(c => (
               <button key={c.id} className={`person ${current === c.id ? 'selected' : ''}`}
-                onClick={() => setCurrent(c.id)}>
+                onClick={() => { setCurrent(c.id); setThreadOpen(true); }}>
                 <span className="avatar">{c.partnerName.charAt(0).toUpperCase()}</span>
-                <span className="person-detail"><b>{c.partnerName}</b><small>{c.lastMessage?.content ?? 'Bắt đầu trò chuyện'}</small></span>
-                {!c.canSend && <span className="readonly">Chỉ đọc</span>}
+                <span className="person-detail"><b>{c.partnerName}</b><small>{c.blockedByPartner ? 'Bạn đã bị chặn' : c.lastMessage?.content ?? 'Bắt đầu trò chuyện'}</small></span>
+                {!c.canSend && !c.blockedByPartner && <span className="readonly">Chỉ đọc</span>}
               </button>
             ))}
         </aside>
         <section className="chat-pane" aria-label="Cửa sổ trò chuyện">
           <div className="chat-top">
+            <button type="button" className="chat-back" onClick={() => setThreadOpen(false)} aria-label="Về danh sách hội thoại">←</button>
             <div><h2>{active?.partnerName ?? 'Chọn cuộc trò chuyện'}</h2>
-              <small>{active?.canSend ? 'Hội thoại đang hoạt động' : 'Chưa chọn hoặc không thể gửi'}</small></div>
+              {!blockedByPartner && <small>{active?.canSend ? 'Hội thoại đang hoạt động' : 'Chưa chọn hoặc không thể gửi'}</small>}</div>
             {active && <div className="chat-top-actions">
-              <a className="chat-action" href={'/profile?user=' + encodeURIComponent(active.partnerId)}>Hồ sơ</a>
+              {!blockedByPartner && <a className="chat-action" href={'/profile?user=' + encodeURIComponent(active.partnerId)}>Hồ sơ</a>}
               <button type="button" className="chat-block" onClick={() => void blockPartner(active)}>Chặn</button>
             </div>}
           </div>
-          <div className="messages" aria-live="polite">
+          {blockedByPartner ? <div className="messages">
+            <div className="blocked-conversation" role="status">
+              <NavIcon name="lock" />
+              <strong>Bạn đã bị chặn</strong>
+              <p>Bạn không thể gửi tin nhắn hoặc quà trong cuộc hội thoại này.</p>
+            </div>
+          </div> : <><div className="messages" aria-live="polite">
             {cursor && <button className="older" onClick={() => void loadOld()} disabled={busy}>Tải tin nhắn cũ</button>}
             {busy && <p className="muted">Đang tải...</p>}
             {messages.length === 0 && !busy && <div className="empty centered">Chưa có tin nhắn.</div>}
@@ -359,14 +389,14 @@ export function ChatPage({ token, userId, displayName, getAccessToken }: Props) 
             </button>)}</div>{giftBusy && <p role="status">Đang gửi quà…</p>}
           </section>}
           <form className="composer" onSubmit={e => { e.preventDefault(); void send(); }}>
-            <button type="button" className="gift-toggle" aria-label="Tặng quà" aria-expanded={giftOpen} disabled={!active?.canSend || giftBusy} onClick={() => void openGifts()}>🎁</button>
+            <button type="button" className="gift-toggle" aria-label="Tặng quà" aria-expanded={giftOpen} disabled={!active?.canSend || giftBusy} onClick={() => void openGifts()}><NavIcon name="gift" /></button>
             <label htmlFor="message-input" className="sr-only">Nhập nội dung tin nhắn</label>
             <input id="message-input" value={draft} onChange={e => setDraft(e.target.value)}
               disabled={!active?.canSend} maxLength={2000} placeholder="Nhập tin nhắn..." />
             <button disabled={!active?.canSend || !draft.trim() || status !== 'Đã kết nối'} type="submit">Gửi</button>
-          </form>
+          </form></>}
         </section>
       </div>
-    </main>
+    </section>
   );
 }

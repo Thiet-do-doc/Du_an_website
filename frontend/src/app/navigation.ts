@@ -1,5 +1,5 @@
 export const memberTabs = [
-  ['/', 'Trang chủ', 'home'],
+  ['/', 'Bảng tin', 'home'],
   ['/discover', 'Khám phá', 'compass'],
   ['/chat', 'Trò chuyện', 'chat'],
   ['/notifications', 'Thông báo', 'bell'],
