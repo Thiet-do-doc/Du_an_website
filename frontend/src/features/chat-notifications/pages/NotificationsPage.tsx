@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { authenticatedFetch } from '../../auth/api';
+import { ApiError, authenticatedFetch } from '../../auth/api';
 import { getNotifications, markRead } from '../api/chatApi';
 import type { ChatNotification } from '../types/chat';
 import './notifications.css';
@@ -18,9 +18,14 @@ export function NotificationBadge() {
   const [count, setCount] = useState(0);
   useEffect(() => {
     let active = true;
+    let supported = true;
     const update = () => {
+      if (!supported) return;
       void authenticatedFetch<{ count: number }>('/api/v1/notifications/unread-count')
-        .then(data => { if (active) setCount(data.count); }).catch(() => {});
+        .then(data => { if (active) setCount(data.count); })
+        .catch(error => {
+          if (error instanceof ApiError && (error.status === 404 || error.status === 405)) supported = false;
+        });
     };
     update();
     const timer = window.setInterval(update, 15000);
