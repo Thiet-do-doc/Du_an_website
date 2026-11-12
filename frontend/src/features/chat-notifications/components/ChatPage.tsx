@@ -8,6 +8,7 @@ import { HubConnection, HubConnectionBuilder, HubConnectionState,
 import { getConversations, getMessages, reportMessage } from '../api/chatApi';
 import type { Conversation, Delivery, Message } from '../types/chat';
 import { NavIcon } from '../../../app/NavIcon';
+import { useConversationAvatars } from './useConversationAvatars';
 
 type Props = { token: string; userId: string; getAccessToken?: () => Promise<string> };
 type ConnectionStatus = 'Đang kết nối' | 'Đã kết nối' | 'Đang nối lại' | 'Mất kết nối';
@@ -21,6 +22,12 @@ const mergeById = (before: Message[], incoming: Message[]) => {
   return [...map.values()].sort((a, b) =>
     a.sentAt.localeCompare(b.sentAt) || a.id.localeCompare(b.id));
 };
+function ChatAvatar({ name, source }: { name: string; source?: string }) {
+  return <span className="avatar" aria-hidden="true">
+    {source ? <img src={source} alt="" /> : name.charAt(0).toLocaleUpperCase('vi-VN')}
+  </span>;
+}
+
 export function ChatPage({ token, userId, getAccessToken }: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [current, setCurrent] = useState<string | null>(() => new URLSearchParams(location.search).get('conversation'));
@@ -47,6 +54,8 @@ export function ChatPage({ token, userId, getAccessToken }: Props) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const active = conversations.find(x => x.id === current);
   const blockedByPartner = Boolean(active?.blockedByPartner);
+  const avatars = useConversationAvatars(conversations, userId);
+  const activeAvatar = active && !blockedByPartner ? avatars?.get(active.partnerId) : undefined;
   const blockedRef = useRef(blockedByPartner);
   useEffect(() => {
     currentRef.current = current;
@@ -340,7 +349,7 @@ export function ChatPage({ token, userId, getAccessToken }: Props) {
             : conversations.map(c => (
               <button key={c.id} className={`person ${current === c.id ? 'selected' : ''}`}
                 onClick={() => { setCurrent(c.id); setThreadOpen(true); }}>
-                <span className="avatar">{c.partnerName.charAt(0).toUpperCase()}</span>
+                <ChatAvatar name={c.partnerName} source={c.blockedByPartner ? undefined : avatars?.get(c.partnerId)} />
                 <span className="person-detail"><b>{c.partnerName}</b><small>{c.blockedByPartner ? 'Bạn đã bị chặn' : c.lastMessage?.content ?? 'Bắt đầu trò chuyện'}</small></span>
                 {!c.canSend && !c.blockedByPartner && <span className="readonly">Chỉ đọc</span>}
               </button>
@@ -349,8 +358,11 @@ export function ChatPage({ token, userId, getAccessToken }: Props) {
         <section className="chat-pane" aria-label="Cửa sổ trò chuyện">
           <div className="chat-top">
             <button type="button" className="chat-back" onClick={() => setThreadOpen(false)} aria-label="Về danh sách hội thoại">←</button>
-            <div><h2>{active?.partnerName ?? 'Chọn cuộc trò chuyện'}</h2>
-              {!blockedByPartner && <small>{active?.canSend ? 'Hội thoại đang hoạt động' : 'Chưa chọn hoặc không thể gửi'}</small>}</div>
+            <div className="chat-identity">
+              {active && <ChatAvatar name={active.partnerName} source={activeAvatar} />}
+              <div><h2>{active?.partnerName ?? 'Chọn cuộc trò chuyện'}</h2>
+                {!blockedByPartner && <small>{active?.canSend ? 'Hội thoại đang hoạt động' : 'Chưa chọn hoặc không thể gửi'}</small>}</div>
+            </div>
             {active && <div className="chat-top-actions">
               {!blockedByPartner && <a className="chat-action" href={'/profile?user=' + encodeURIComponent(active.partnerId)}>Hồ sơ</a>}
               <button type="button" className="chat-block" onClick={() => void blockPartner(active)}>Chặn</button>
@@ -366,12 +378,18 @@ export function ChatPage({ token, userId, getAccessToken }: Props) {
             {cursor && <button className="older" onClick={() => void loadOld()} disabled={busy}>Tải tin nhắn cũ</button>}
             {busy && <p className="muted">Đang tải...</p>}
             {messages.length === 0 && !busy && <div className="empty centered">Chưa có tin nhắn.</div>}
-            {messages.map(m => <div key={m.id} className={`bubble-row ${m.senderId === userId ? 'mine' : ''}`}>
-              <div className="bubble">{m.giftCode && <><GiftArt code={m.giftCode}/><small>Quà tặng mylove</small></>}<div className="bubble-text">{m.content}</div>
-                <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
-                {m.senderId !== userId && <button type="button" className="report-message"
-                  onClick={() => void report(m)}>Báo cáo</button>}
-              </div></div>)}
+            {messages.map((m, index) => {
+              const mine = m.senderId === userId;
+              const showAvatar = active?.partnerId === m.senderId && messages[index - 1]?.senderId !== m.senderId;
+              return <div key={m.id} className={`bubble-row ${mine ? 'mine' : 'incoming'}`}>
+                {active && showAvatar && <ChatAvatar name={active.partnerName} source={activeAvatar} />}
+                <div className="bubble">{m.giftCode && <><GiftArt code={m.giftCode}/><small>Quà tặng mylove</small></>}<div className="bubble-text">{m.content}</div>
+                  <time dateTime={m.sentAt}>{dateTime(m.sentAt)}</time>
+                  {!mine && <button type="button" className="report-message"
+                    onClick={() => void report(m)}>Báo cáo</button>}
+                </div>
+              </div>;
+            })}
             {pending.map(p => <div className="bubble-row mine" key={p.clientMessageId}>
               <div className="bubble pending"><div className="bubble-text">{p.content}</div>
                 <small>{p.status === 'sending' ? 'Đang gửi...' : 'Gửi thất bại'}</small>

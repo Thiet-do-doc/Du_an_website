@@ -5,6 +5,8 @@ import type { Interest, Profile, PublicProfile, Photo } from './types';
 export const getMyProfile = () => authenticatedFetch<Profile>('/api/v1/profiles/me');
 export const getPublicProfile = (id: string, signal?: AbortSignal) =>
   authenticatedFetch<PublicProfile>('/api/v1/profiles/' + encodeURIComponent(id), { signal });
+export const getPrivatePhoto = (url: string, signal?: AbortSignal) =>
+  authenticatedFetch<Blob>(url, { signal }, response => response.blob());
 export const getInterests = () => authenticatedFetch<Interest[]>('/api/v1/interests');
 export const saveProfile = (value: { displayName: string; bio: string; city: string; gender: string;
   isDiscoverable: boolean; interestIds: string[] }) => authenticatedFetch<Profile>('/api/v1/profiles/me', {

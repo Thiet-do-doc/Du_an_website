@@ -1,5 +1,5 @@
 import { useEffect, useState, type HTMLAttributes, type ImgHTMLAttributes } from 'react';
-import { authenticatedFetch } from '../auth/api';
+import { getPrivatePhoto } from './api';
 import { AvatarPreview } from './AvatarPreview';
 
 export function usePrivatePhoto(url?: string | null) {
@@ -7,7 +7,7 @@ export function usePrivatePhoto(url?: string | null) {
   useEffect(() => {
     let disposed = false; let objectUrl: string | undefined;
     setPhoto(undefined);
-    if (url) void authenticatedFetch<Blob>(url, {}, r => r.blob()).then(blob => {
+    if (url) void getPrivatePhoto(url).then(blob => {
       if (!disposed) {
         objectUrl = URL.createObjectURL(blob);
         setPhoto({ url, source: objectUrl });
