@@ -7,6 +7,7 @@ map $http_upgrade $datingapp_connection {
 server {
     listen 80;
     server_name staging.example.org;
+    access_log off; # HTTP redirects can also receive password reset links.
     return 308 https://staging.example.org$request_uri;
 }
 

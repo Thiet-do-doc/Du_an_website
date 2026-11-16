@@ -46,6 +46,16 @@ jobs:
           export NODE_EXTRA_CA_CERTS="$tls/fullchain.pem"
           curl --retry 10 --retry-connrefused --retry-delay 1 --fail --cacert "$tls/fullchain.pem" https://localhost:8443/healthz
           node scripts/staging-smoke.mjs https://localhost:8443
+          marker="auth-log-probe-$(openssl rand -hex 12)"
+          reset_link="https://localhost:8443/reset-password?token=$marker"
+          curl --fail --silent --show-error --output /dev/null "http://localhost:8181/reset-password?token=$marker"
+          curl --fail --silent --show-error --output /dev/null --cacert "$tls/fullchain.pem" "$reset_link"
+          curl --fail --silent --show-error --output /dev/null --cacert "$tls/fullchain.pem" --referer "$reset_link" https://localhost:8443/
+          logs="$(docker compose logs --no-color api web)$(docker logs issue31-edge 2>&1)"
+          if [[ "$logs" == *"$marker"* ]]; then
+            echo 'Reset token canary leaked into staging logs' >&2
+            exit 1
+          fi
           docker compose exec -T postgres psql -U smoke -d smoke -v ON_ERROR_STOP=1 -c "CREATE TABLE issue31_probe AS SELECT 31 AS value"
           docker compose stop web api postgres
           docker compose up -d --wait --force-recreate

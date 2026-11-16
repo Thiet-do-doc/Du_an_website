@@ -24,7 +24,24 @@ const asset = index.match(/<script[^>]+src="(\/assets\/[^"]+\.js)"/)?.[1];
 assert.ok(asset, 'Không thấy JS bundle trong React build');
 assert.match((await get(asset)).headers.get('content-type') ?? '', /javascript/);
 const csrf = await get('/api/v1/auth/csrf');
-assert.ok(csrf.headers.getSetCookie().some(s => /^datingapp\.csrf=/i.test(s) && /;\s*secure\b/i.test(s)), 'Cookie CSRF cần Secure');
+const csrfCookie = csrf.headers.getSetCookie().find(s => /^datingapp\.csrf=/i.test(s)) ?? '';
+const [csrfCookiePair, ...csrfAttributes] = csrfCookie.split(';').map(part => part.trim());
+for (const attribute of ['secure', 'httponly', 'samesite=strict']) {
+  assert.ok(csrfAttributes.some(value => value.toLowerCase() === attribute), `Cookie CSRF thiếu ${attribute}`);
+}
 assert.ok((await csrf.json()).token, 'Thiếu CSRF token');
+
+const foreignOrigin = 'https://foreign-origin.example';
+const refreshUrl = new URL('/api/v1/auth/refresh', origin.origin);
+const preflight = await fetch(refreshUrl, {
+  method: 'OPTIONS', signal: AbortSignal.timeout(15000),
+  headers: { Origin: foreignOrigin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'X-CSRF-TOKEN' },
+});
+assert.equal(preflight.headers.get('access-control-allow-origin'), null, 'Origin ngoài không được phép dùng API Auth');
+const noCsrf = await fetch(refreshUrl, {
+  method: 'POST', signal: AbortSignal.timeout(15000),
+  headers: { Origin: foreignOrigin, Cookie: csrfCookiePair },
+});
+assert.equal(noCsrf.status, 400, 'Refresh thiếu CSRF token phải bị từ chối');
 await get('/api/v1/admin/reports', 401);
-console.log('PASS HTTPS, API/DB, SPA /admin, JS bundle, CSRF Secure và admin 401.');
+console.log('PASS HTTPS, API/DB, SPA /admin, JS bundle, cookie CSRF, origin ngoài, refresh thiếu CSRF và admin 401.');
