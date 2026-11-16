@@ -117,8 +117,9 @@ TV4 vẫn phải kiểm tra match, block và quyền đọc/gửi ở từng ngh
 query chứa access_token. Bộ registry hiện dành cho một backend như kế hoạch;
 nhiều instance cần cơ chế phát sự kiện thu hồi giữa các instance.
 
-Repo hiện chưa có ChatHub hoặc API SafetyAdmin thật. Hợp đồng/filter có kiểm thử,
-nhưng nghiệm thu chat–khóa xuyên module chờ TV4/TV5 triển khai module của họ.
+ChatHub và API SafetyAdmin đã được tích hợp. Bài
+`RealModulesConnectProfilesMatchChatBlockReportAndAccountRevocation` kiểm tra
+quyền qua hồ sơ, match, chat, báo cáo và thu hồi phiên trên PostgreSQL.
 
 ## Cấp Admin và production
 
@@ -146,6 +147,13 @@ và Jwt:Key qua biến môi trường/secrets. SMTP dùng TLS. Cookie refresh/CS
 SameSite Strict. Phục vụ frontend/API cùng origin qua proxy. Cấu hình
 `DataProtection:KeyPath` tới volume bền vững, phân quyền và bảo vệ khóa; nếu mất
 khóa thì CSRF/link xác nhận/reset cũ không dùng được. Không đưa secrets vào Git.
+
+## Hồi quy Auth tuần 5
+
+1. Dùng database thử và chạy migration, build, backend test và frontend test theo hướng dẫn bên dưới. Các ca cần đối chiếu gồm JWT và refresh token hết hạn, refresh replay, logout, reset một lần, khóa tài khoản đang có phiên và User gọi API Admin.
+2. Triển khai SHA đã review theo [runbook staging](ISSUE_31_STAGING.md). Dùng Node 24 chạy `node scripts/staging-smoke.mjs https://<host>` để kiểm tra cookie CSRF `Secure`, `HttpOnly`, `SameSite=Strict`, origin ngoài và refresh thiếu CSRF. Kiểm tra cookie phiên sau đăng nhập bằng DevTools với tài khoản thử, chỉ ghi lại thuộc tính cookie.
+3. Cập nhật cả Nginx của web và proxy TLS trên host. Access log của web chỉ ghi phương thức và đường dẫn, bỏ query và Referer. Hai listener trong mẫu proxy TLS tắt access log. Job `staging-compose` gửi dấu thử ngẫu nhiên trong URL reset và Referer rồi kiểm tra log của proxy, web và API. Trên host của nhóm, dùng dấu thử tương tự khi xác minh cấu hình đang phục vụ, tránh chép token thật vào biên bản.
+4. Ghi SHA, kết quả CI và PASS/FAIL cho từng ca đã thực hiện. Cùng nhóm xác nhận quyền truy cập dữ liệu, match và tin nhắn đã lưu trước khi chốt ứng viên. Với lỗi còn lại, ghi mức độ, người phụ trách, bước tái hiện và hạn xử lý.
 
 ## Kiểm thử và phạm vi nghiệm thu
 
