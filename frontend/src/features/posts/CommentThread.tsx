@@ -8,8 +8,8 @@ type Comment = { id: string; authorId?: string; authorName: string; content: str
   parentId?: string | null; replyCount?: number; myReaction?: Reaction | null; reactions?: Record<Reaction, number> };
 const date = (value: string) => new Date(value).toLocaleString('vi-VN', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 
-export function CommentThread({ postId, parentId, parentName, onChange, onAdded, depth = 0 }: {
-  postId: string; parentId?: string; parentName?: string; onChange: () => Promise<void>; onAdded?: () => void; depth?: number;
+export function CommentThread({ postId, parentId, parentName, onChange, onCountChanged, depth = 0 }: {
+  postId: string; parentId?: string; parentName?: string; onChange: () => Promise<void>; onCountChanged?: (delta: number) => void; depth?: number;
 }) {
   const [items, setItems] = useState<Comment[]>([]);
   const [page, setPage] = useState(1);
@@ -40,7 +40,7 @@ export function CommentThread({ postId, parentId, parentName, onChange, onAdded,
     sending.current = true; setBusy(true); setError('');
     try {
       await authenticatedFetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: draft.trim(), parentId }) });
-      setDraft(''); setPage(1); setVersion(x => x + 1); onAdded?.(); await onChange();
+      setDraft(''); setPage(1); setVersion(x => x + 1); onCountChanged?.(1); await onChange();
     } catch (e) { setError(e instanceof Error ? e.message : 'Chưa gửi được bình luận.'); }
     finally { sending.current = false; setBusy(false); }
   }
@@ -51,12 +51,13 @@ export function CommentThread({ postId, parentId, parentName, onChange, onAdded,
     {error && <p role="alert">{error} <button onClick={() => setVersion(x => x + 1)}>Tải lại</button></p>}
     {loading && <p role="status">Đang tải bình luận…</p>}
     {!loading && !error && !items.length && <p className="comment-empty">{parentId ? 'Hãy là người đầu tiên trả lời.' : 'Chưa có bình luận.'}</p>}
-    {items.map(item => <CommentItem key={item.id} item={item} path={path} depth={depth} postId={postId} onChange={onChange} />)}
+    {items.map(item => <CommentItem key={item.id} item={item} path={path} depth={depth} postId={postId} onChange={onChange}
+      onDeleted={() => { setPage(1); setVersion(value => value + 1); onCountChanged?.(-1); }} />)}
     {more && <button disabled={loading} onClick={() => setPage(x => x + 1)}>Xem thêm {parentId ? 'câu trả lời' : 'bình luận'}</button>}
   </section>;
 }
-function CommentItem({ item, path, postId, onChange, depth }: {
-  item: Comment; path: string; postId: string; onChange: () => Promise<void>; depth: number;
+function CommentItem({ item, path, postId, onChange, onDeleted, depth }: {
+  item: Comment; path: string; postId: string; onChange: () => Promise<void>; onDeleted: () => void; depth: number;
 }) {
   const { session } = useAuth();
   const [comment, setComment] = useState(item);
@@ -94,14 +95,24 @@ function CommentItem({ item, path, postId, onChange, depth }: {
     } catch { setError('Hiện chưa thể nhắn tin với người này.'); }
     finally { setBusy(false); }
   }
+  async function remove() {
+    if (inFlight.current || !window.confirm('Xóa bình luận này và các câu trả lời bên dưới?')) return;
+    inFlight.current = true; setBusy(true); setError('');
+    try {
+      await authenticatedFetch(path + '/' + item.id, { method: 'DELETE' });
+      onDeleted(); await onChange();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Chưa xóa được bình luận.'); }
+    finally { inFlight.current = false; setBusy(false); }
+  }
   return <article className="comment-item">
     <div className="comment-content"><strong>{comment.authorName}</strong> <time dateTime={comment.createdAtUtc}>{date(comment.createdAtUtc)}</time><p>{comment.content}</p></div>
     <div className="comment-actions" aria-label="Tương tác bình luận">
       {comment.reactions && <ReactionPicker value={comment.myReaction ?? null} counts={comment.reactions} disabled={busy} onSelect={kind => void react(kind)} />}
       {typeof comment.replyCount === 'number' && <button aria-expanded={replyOpen} onClick={() => setReplyOpen(!replyOpen)}>Trả lời{comment.replyCount > 0 && ' · ' + comment.replyCount}</button>}
       {item.authorId && item.authorId !== session?.user.id && <><button disabled={busy} onClick={() => void message()}>Nhắn tin</button><a href={'/profile?user=' + item.authorId}>Hồ sơ</a></>}
+      {item.authorId === session?.user.id && <button disabled={busy} onClick={() => void remove()}>Xóa bình luận</button>}
     </div>
     {error && <p role="alert">{error}</p>}
-    {replyOpen && typeof comment.replyCount === 'number' && <div style={{ marginLeft: depth < 2 ? 16 : 0 }}><CommentThread postId={postId} parentId={comment.id} parentName={comment.authorName} depth={depth + 1} onChange={onChange} onAdded={() => setComment(old => ({ ...old, replyCount: (old.replyCount ?? 0) + 1 }))} /></div>}
+    {replyOpen && typeof comment.replyCount === 'number' && <div style={{ marginLeft: depth < 2 ? 16 : 0 }}><CommentThread postId={postId} parentId={comment.id} parentName={comment.authorName} depth={depth + 1} onChange={onChange} onCountChanged={delta => setComment(old => ({ ...old, replyCount: Math.max(0, (old.replyCount ?? 0) + delta) }))} /></div>}
   </article>;
 }

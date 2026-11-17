@@ -20,6 +20,8 @@ export function PostCard({ post, onChange, onDelete, onBlockAuthor, deleting }: 
   const [error, setError] = useState('');
   const [shareNotice, setShareNotice] = useState('');
   const [copyLink, setCopyLink] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(post.content);
   const path = '/api/v1/posts/' + post.id;
   const profileUrl = post.isMine ? '/profile' : '/profile?user=' + encodeURIComponent(post.authorId);
   const avatar = post.authorAvatarId
@@ -57,10 +59,21 @@ export function PostCard({ post, onChange, onDelete, onBlockAuthor, deleting }: 
       : <span className="post-avatar" aria-hidden="true">{avatar}</span>}
       <div><h3>{post.canOpenAuthorProfile ? <a className="post-author" href={profileUrl}>{post.authorName}</a> : post.authorName}{post.isMine && ' · Bạn'}</h3>
         <time dateTime={post.createdAtUtc}>{date(post.createdAtUtc)}</time></div>
-      {post.isMine && <button type="button" className="post-delete" disabled={deleting} onClick={onDelete}>Xóa bài</button>}
+      {post.isMine && <><button type="button" disabled={busy || deleting} onClick={() => { setDraft(post.content); setEditing(true); }}>Sửa bài</button>
+        <button type="button" className="post-delete" disabled={busy || deleting} onClick={onDelete}>Xóa bài</button></>}
     </header>
     {post.feeling && <p className="post-feeling"><NavIcon name="smile" />Đang cảm thấy {post.feeling.toLocaleLowerCase('vi')}</p>}
-    {post.content && <p className="post-body">{post.content}</p>}
+    {editing ? <form onSubmit={event => {
+      event.preventDefault();
+      void run(async () => {
+        const saved = await authenticatedFetch<Post>(path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: draft, feeling: post.feeling }) });
+        onChange(saved); setEditing(false);
+      });
+    }}><label htmlFor={'post-content-' + post.id}>Nội dung bài viết</label><textarea id={'post-content-' + post.id} rows={4} maxLength={2000} value={draft} disabled={busy} onChange={event => setDraft(event.target.value)} />
+      <button disabled={busy || (!draft.trim() && !post.feeling && !post.hasPhoto)}>Lưu chỉnh sửa</button>
+      <button type="button" disabled={busy} onClick={() => setEditing(false)}>Hủy</button></form>
+      : post.content && <p className="post-body">{post.content}</p>}
     {post.hasPhoto && <PrivatePhoto className="post-image" src={path + '/photo'} alt={'Ảnh trong bài của ' + post.authorName} />}
     <div className="post-actions">
       <button type="button" aria-pressed={post.isLiked} disabled={busy} onClick={() => void run(toggleLike)}>
@@ -75,6 +88,7 @@ export function PostCard({ post, onChange, onDelete, onBlockAuthor, deleting }: 
     {open && <CommentThread postId={post.id} onChange={async () => { onChange(await authenticatedFetch<Post>(path)); }} />}
     {error && <p role="alert" className="text-danger">{error}</p>}
     {!post.isMine && <div className="post-safety">
+      <a className="text-link" href={'/safety?post=' + encodeURIComponent(post.id)}>Báo cáo bài viết</a>
       <a className="text-link" href={'/safety?user=' + encodeURIComponent(post.authorId)}>Báo cáo người dùng</a>
       <button type="button" className="post-block" disabled={busy} onClick={() => void run(blockAuthor)}>Chặn người dùng</button>
     </div>}

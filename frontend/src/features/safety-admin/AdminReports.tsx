@@ -11,6 +11,7 @@ type Audit = { id: string; action: string; actorUserId: string; reason: string; 
 const actionNames: Record<string, string> = {
   ReportReviewed: 'Xem xét báo cáo', ReportDismissed: 'Bác bỏ báo cáo', ReportActioned: 'Xử lý báo cáo',
   AccountSuspended: 'Khóa tài khoản', AccountReactivated: 'Mở tài khoản', MessageEvidenceRead: 'Xem bằng chứng',
+  PostEvidenceRead: 'Xem bằng chứng bài viết', PostHidden: 'Ẩn bài viết',
 };
 const targetNames = { User: 'Người dùng', Message: 'Tin nhắn', Post: 'Bài viết' };
 const reportsUrl = '/api/v1/admin/reports';
@@ -90,7 +91,7 @@ function ReportDetail({ id, onReview }: { id: string; onReview: () => void }) {
   const [report, setReport] = useState<Report | null>(null);
   const [actions, setActions] = useState<Audit[]>([]);
   const [reason, setReason] = useState('');
-  const [evidence, setEvidence] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<{ content: string; feeling?: string; photoUrl?: string; deleted?: boolean; isHidden?: boolean } | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -140,15 +141,32 @@ function ReportDetail({ id, onReview }: { id: string; onReview: () => void }) {
         <p><strong>{report.reason}</strong></p>
         <p>{report.description}</p>
       </div>
-      {report.targetType === 'Message' && (evidence !== null ? <blockquote className="report-evidence">{evidence}</blockquote> :
+      {(report.targetType === 'Message' || report.targetType === 'Post') && (evidence !== null ? <div className="report-evidence">
+        {report.targetType === 'Post' && <p>Nội dung lưu khi gửi báo cáo.</p>}
+        <blockquote>{evidence.content}</blockquote>
+        {evidence.feeling && <p>{evidence.feeling}</p>}
+        {evidence.photoUrl && <img src={evidence.photoUrl} alt="Ảnh bài viết được báo cáo" style={{ maxWidth: '100%' }} />}
+        {evidence.deleted && <p>Tác giả đã xóa bài viết.</p>}
+        {evidence.isHidden && <p>Bài viết đã được ẩn.</p>}
+      </div> :
         <div className="safety-actions">
           <button type="button" className="btn btn-outline-dark" disabled={busy} onClick={() => void perform(async () => {
-            const message = await authenticatedFetch<{ content: string }>(url + '/evidence', { method: 'POST' });
-            setEvidence(message.content);
-          })}>Xem tin nhắn được báo cáo</button>
+            setEvidence(await authenticatedFetch(url + '/evidence', { method: 'POST' }));
+          })}>{report.targetType === 'Post' ? 'Xem bài viết được báo cáo' : 'Xem tin nhắn được báo cáo'}</button>
         </div>)}
       <label>Lý do xử lý<textarea rows={3} value={reason} maxLength={2000} onChange={e => setReason(e.target.value)} placeholder="Nhập lý do xử lý (tối thiểu 5 ký tự nếu khóa/mở tài khoản)…" /></label>
       <div className="safety-actions">
+        {report.targetType === 'Post' && availableTransitions.length > 0 && <button type="button" className="btn btn-dark"
+          disabled={busy || reason.trim().length < 5 || reason.trim().length > 500 || evidence === null || evidence.deleted}
+          onClick={() => {
+            if (!window.confirm('Ẩn bài viết này khỏi cộng đồng và hoàn tất báo cáo?')) return;
+            void perform(async () => {
+              setReport(await authenticatedFetch<Report>(url + '/hide-post', { method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason.trim() }) }));
+              setEvidence(old => old && ({ ...old, isHidden: true }));
+              setReason(''); setNotice('Đã ẩn bài viết và ghi nhận kết quả xử lý.'); onReview();
+            });
+          }}>Ẩn bài viết và xử lý báo cáo</button>}
         {availableTransitions.map(value =>
           <button key={value} type="button" className={value === 'Actioned' ? 'btn btn-dark' : 'btn btn-outline-dark'} disabled={busy || !reason.trim()} onClick={() => void perform(() => review(value))}>{statusNames[value]}</button>)}
         {report.targetUserId && [false, true].map(active => <button key={String(active)} type="button"

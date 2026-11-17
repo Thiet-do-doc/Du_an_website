@@ -6,6 +6,7 @@ using DatingApp.Api.Modules.SafetyAdmin.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using DatingApp.Api.Modules.Posts.Entities;
 
 namespace DatingApp.Api.Modules.SafetyAdmin.Controllers;
 
@@ -88,6 +89,23 @@ public sealed class AdminModerationController(
     public async Task<IActionResult> ReadMessageEvidence(Guid id, CancellationToken cancellationToken)
     {
         var report = await db.Reports.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (report?.TargetType == ReportTargetType.Post)
+        {
+            if (!Guid.TryParse(report.TargetId, out var postId) || !Guid.TryParse(report.TargetUserId, out var authorId)) return NotFound();
+            var post = await db.Set<Post>().AsNoTracking().SingleOrDefaultAsync(p => p.Id == postId && p.AuthorId == authorId, cancellationToken);
+            if (report.EvidenceContent is null && post is null) return NotFound();
+            var content = report.EvidenceContent ?? post!.Content;
+            var feeling = report.EvidenceContent is null ? post?.Feeling : report.EvidenceFeeling;
+            var photo = report.EvidenceContent is null ? post?.PhotoContent : report.EvidencePhoto;
+            var photoType = report.EvidenceContent is null ? post?.PhotoType : report.EvidencePhotoType;
+            db.ModerationActions.Add(new ModerationAction {
+                Id = Guid.NewGuid(), ReportId = id, ActorUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+                TargetUserId = authorId.ToString(), Action = "PostEvidenceRead", Reason = "Xem bài viết được báo cáo"
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            return Ok(new { id = postId, content, feeling, isHidden = post?.IsHidden, deleted = post is null,
+                photoUrl = photo is null ? null : $"data:{photoType};base64,{Convert.ToBase64String(photo)}" });
+        }
         if (report?.TargetType != ReportTargetType.Message || !Guid.TryParse(report.TargetId, out var messageId)
             || !Guid.TryParse(report.TargetUserId, out var senderId)) return NotFound();
         var message = await db.Messages.AsNoTracking().Where(x => x.Id == messageId && x.SenderId == senderId)
@@ -99,6 +117,37 @@ public sealed class AdminModerationController(
         });
         await db.SaveChangesAsync(cancellationToken);
         return Ok(message);
+    }
+
+    [HttpPost("reports/{id:guid}/hide-post")]
+    public async Task<IActionResult> HidePost(Guid id, HideReportedPostRequest request, CancellationToken ct)
+    {
+        var reason = request.Reason.Trim();
+        if (reason.Length < 5) return BadRequest(new { message = "Lý do cần ít nhất 5 ký tự." });
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var report = (await db.Reports.FromSqlInterpolated($"SELECT * FROM \"Reports\" WHERE \"Id\" = {id} FOR UPDATE")
+            .ToListAsync(ct)).SingleOrDefault();
+        if (report?.TargetType != ReportTargetType.Post || !Guid.TryParse(report.TargetId, out var postId) ||
+            !Guid.TryParse(report.TargetUserId, out var authorId)) return NotFound();
+        if (await db.ModerationActions.AnyAsync(a => a.ReportId == id && a.Action == "PostHidden", ct))
+            return Ok(ReportsController.ToResponse(report));
+        if (report.Status is ReportStatus.Dismissed or ReportStatus.Actioned)
+            return Conflict(new { message = "Báo cáo đã được xử lý. Hãy tải lại." });
+        var changed = await db.Set<Post>().Where(p => p.Id == postId && p.AuthorId == authorId)
+            .ExecuteUpdateAsync(update => update.SetProperty(p => p.IsHidden, true), ct);
+        if (changed == 0) return NotFound(new { message = "Bài viết đã được xóa." });
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+        report.Status = ReportStatus.Actioned;
+        report.ReviewedByUserId = actor;
+        report.ReviewNotes = reason;
+        report.ReviewedAtUtc = DateTime.UtcNow;
+        db.ModerationActions.Add(new ModerationAction {
+            Id = Guid.NewGuid(), ReportId = id, ActorUserId = actor, TargetUserId = authorId.ToString(),
+            Action = "PostHidden", Reason = reason
+        });
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return Ok(ReportsController.ToResponse(report));
     }
 
     [HttpPatch("users/{id}/status")]

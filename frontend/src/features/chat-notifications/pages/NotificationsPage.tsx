@@ -22,7 +22,7 @@ export function NotificationBadge() {
     const update = () => {
       if (!supported) return;
       void authenticatedFetch<{ count: number }>('/api/v1/notifications/unread-count')
-        .then(data => { if (active) setCount(data.count); })
+        .then(data => { if (active) { setCount(data.count); window.dispatchEvent(new Event('notifications-synced')); } })
         .catch(error => {
           if (error instanceof ApiError && (error.status === 404 || error.status === 405)) supported = false;
         });
@@ -43,34 +43,71 @@ export default function NotificationsPage() {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const alive = useRef(true);
   const loading = useRef(false);
-  const load = useCallback(async (older?: string) => {
-    if (loading.current) return;
-    loading.current = true; setBusy(true); setError('');
+  const loadedCount = useRef(0);
+  const pendingRefresh = useRef(false);
+  const readRevision = useRef(0);
+  const [marking, setMarking] = useState(false);
+  const load = useCallback(async (older?: string, background = false) => {
+    if (loading.current) { if (!older) pendingRefresh.current = true; return; }
+    const revision = readRevision.current;
+    loading.current = true; if (!background) setBusy(true); setError('');
     try {
-      const page = await getNotifications('', { cursor: older });
+      let page = await getNotifications('', { cursor: older });
+      const refreshed = [...page.items];
+      // Revalidate every loaded page so blocks and removed posts disappear too.
+      while (!older && page.nextCursor && refreshed.length < loadedCount.current && alive.current) {
+        page = await getNotifications('', { cursor: page.nextCursor });
+        refreshed.push(...page.items);
+      }
       if (!alive.current) return;
-      setItems(old => older ? [...old, ...page.items.filter(x => !old.some(y => y.id === x.id))] : page.items);
+      if (revision !== readRevision.current) { pendingRefresh.current = true; return; }
+      setItems(old => {
+        const updated = older ? [...old, ...refreshed.filter(x => !old.some(y => y.id === x.id))] : refreshed;
+        loadedCount.current = updated.length;
+        return updated;
+      });
       setCursor(page.nextCursor);
     } catch (e) { if (alive.current) setError(e instanceof Error ? e.message : 'Chưa tải được thông báo.'); }
-    finally { loading.current = false; if (alive.current) setBusy(false); }
+    finally {
+      loading.current = false;
+      if (alive.current) {
+        setBusy(false);
+        if (pendingRefresh.current) { pendingRefresh.current = false; void load(undefined, true); }
+      }
+    }
   }, []);
   useEffect(() => {
     alive.current = true; void load();
-    return () => { alive.current = false; };
+    const refresh = () => { void load(undefined, true); };
+    window.addEventListener('notifications-synced', refresh);
+    return () => { alive.current = false; window.removeEventListener('notifications-synced', refresh); };
   }, [load]);
   async function read(item: ChatNotification) {
     try {
       const saved = await markRead('', item.id);
+      readRevision.current++;
       setItems(old => old.map(x => x.id === saved.id ? saved : x));
       window.dispatchEvent(new Event('notifications-read'));
     } catch (e) { setError(e instanceof Error ? e.message : 'Chưa đánh dấu được thông báo.'); }
+  }
+  async function readAll() {
+    if (marking) return;
+    setMarking(true); setError('');
+    try {
+      await authenticatedFetch('/api/v1/notifications/read-all', { method: 'PATCH' });
+      readRevision.current++;
+      await load();
+      window.dispatchEvent(new Event('notifications-read'));
+    } catch (e) { setError(e instanceof Error ? e.message : 'Chưa đánh dấu được thông báo.'); }
+    finally { setMarking(false); }
   }
   const shown = items.filter(x => !unreadOnly || !x.readAt);
   return <section className="notification-page feature-page">
     <header><h1>Thông báo</h1><p className="page-lead">Các cập nhật về lượt thích, bài viết và ghép đôi.</p></header>
     <div className="notification-filters"><button aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)}>Tất cả</button>
       <button aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>Chưa đọc</button>
-      <button disabled={busy} onClick={() => void load()}>Làm mới</button></div>
+      <button disabled={busy} onClick={() => void load()}>Làm mới</button>
+      <button disabled={marking || busy} onClick={() => void readAll()}>Đánh dấu tất cả đã đọc</button></div>
     {error && <p role="alert">{error}</p>}
     {busy && <p role="status">Đang tải thông báo…</p>}
     {!busy && !error && !shown.length && <div className="ml-card"><p>{unreadOnly ? 'Không có thông báo chưa đọc trong phần đã tải.' : 'Bạn chưa có thông báo. Những kết nối mới sẽ xuất hiện ở đây.'}</p></div>}

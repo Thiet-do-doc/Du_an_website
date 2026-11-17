@@ -114,6 +114,14 @@ public sealed partial class AuthFlowTests
         Assert.Equal(HttpStatusCode.OK, (await a.GetApi(photoPath, at)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"conversations/{conversationId}/messages", at)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await a.GetApi($"conversations/{conversationId}/gifts", at)).StatusCode);
+        var blockedConversation = (await (await a.GetApi("conversations", at)).Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("items").EnumerateArray().Single();
+        Assert.Equal(conversationId, blockedConversation.GetProperty("id").GetGuid());
+        Assert.True(blockedConversation.GetProperty("blockedByPartner").GetBoolean());
+        Assert.False(blockedConversation.GetProperty("canSend").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, blockedConversation.GetProperty("lastMessage").ValueKind);
+        Assert.Empty((await (await b.GetApi("conversations", bt)).Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("items").EnumerateArray());
         using (var scope = app.Services.CreateScope())
             Assert.Equal(403, (await Assert.ThrowsAsync<ChatDomainException>(() => scope.ServiceProvider
                 .GetRequiredService<ChatService>().SendGiftAsync(conversationId, alice.Id, "bear", Guid.NewGuid()))).StatusCode);
@@ -123,6 +131,11 @@ public sealed partial class AuthFlowTests
                 .GetRequiredService<ChatService>().SendMessageAsync(conversationId, alice.Id, "blocked", Guid.NewGuid()))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await b.WriteApi(HttpMethod.Post, "reports", report, bt)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await b.WriteApi(HttpMethod.Delete, $"blocks/{alice.Id}", null, bt)).StatusCode);
+        var restoredConversation = (await (await a.GetApi("conversations", at)).Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("items").EnumerateArray().Single();
+        Assert.False(restoredConversation.GetProperty("blockedByPartner").GetBoolean());
+        Assert.True(restoredConversation.GetProperty("canSend").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, (await a.GetApi($"conversations/{conversationId}/messages", at)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await a.WriteApi(HttpMethod.Delete, $"matches/{matchId}", null, at)).StatusCode);
         Assert.Equal("unmatched", (await Connection(a, bob.Id, at)).GetProperty("state").GetString());
         using (var scope = app.Services.CreateScope())

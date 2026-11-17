@@ -10,7 +10,7 @@ public sealed record MessageDto(Guid Id, Guid ConversationId, Guid SenderId, Gui
 }
 
 public sealed record ConversationDto(Guid Id, Guid MatchId, Guid PartnerId, string PartnerName,
-    DateTimeOffset CreatedAt, MessageDto? LastMessage, bool CanSend);
+    DateTimeOffset CreatedAt, MessageDto? LastMessage, bool CanSend, bool BlockedByPartner = false);
 public sealed record MessagesPage(IReadOnlyList<MessageDto> Items, string? NextCursor, Guid? NextAfterId);
 public sealed record NotificationDto(Guid Id, string Type, Guid TargetId, Guid? ConversationId,
     DateTimeOffset CreatedAt, DateTimeOffset? ReadAt, string? Text = null)

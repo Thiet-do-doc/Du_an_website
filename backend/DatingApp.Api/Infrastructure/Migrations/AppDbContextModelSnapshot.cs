@@ -382,6 +382,9 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("boolean");
+
                     b.Property<byte[]>("PhotoContent")
                         .HasColumnType("bytea");
 
@@ -698,6 +701,18 @@ namespace DatingApp.Api.Infrastructure.Data.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EvidenceContent")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EvidenceFeeling")
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("EvidencePhoto")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("EvidencePhotoType")
                         .HasColumnType("text");
 
                     b.Property<string>("Reason")

@@ -26,7 +26,7 @@ public sealed class NotificationService(AppDbContext db, IHubContext<ChatHub> hu
                 b.BlockedUserId == userId && b.BlockerUserId == n.ActorId)) &&
             (n.Type != "friendPost" && n.Type != "postLike" && n.Type != "comment" && n.Type != "reply" ||
                 db.Set<DatingApp.Api.Modules.Posts.Entities.Post>().Any(p => p.Id == n.TargetId &&
-                    p.Author.IsActive && p.Author.EmailConfirmed &&
+                    !p.IsHidden && p.Author.IsActive && p.Author.EmailConfirmed &&
                     !db.Blocks.Any(b => b.BlockerUserId == userId && b.BlockedUserId == p.AuthorId ||
                         b.BlockedUserId == userId && b.BlockerUserId == p.AuthorId))));
 
@@ -148,6 +148,10 @@ public sealed class NotificationService(AppDbContext db, IHubContext<ChatHub> hu
         await db.SaveChangesAsync(ct);
         return NotificationDto.From(n);
     }
+
+    public Task<int> MarkAllReadAsync(Guid userId, CancellationToken ct) =>
+        Visible(db.Notifications, userId).Where(n => n.ReadAt == null)
+            .ExecuteUpdateAsync(update => update.SetProperty(n => n.ReadAt, DateTimeOffset.UtcNow), ct);
 
     private static string? FindPostgresState(Exception exception)
     {

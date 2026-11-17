@@ -1,9 +1,10 @@
 using DatingApp.Api.Infrastructure.Data;
+using DatingApp.Api.Modules.SafetyAdmin.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace DatingApp.Api.Modules.ChatNotifications.Services;
 
-public sealed record ConversationAccess(bool CanRead, bool CanSend, Guid PartnerId, Guid MatchId)
+public sealed record ConversationAccess(bool CanRead, bool CanSend, Guid PartnerId, Guid MatchId, bool BlockedByPartner = false)
 {
     public static ConversationAccess Denied { get; } = new(false, false, Guid.Empty, Guid.Empty);
 }
@@ -20,10 +21,10 @@ public interface IChatMatchAccess
 
 public sealed record ChatMatchSnapshot(Guid Id, Guid UserLowId, Guid UserHighId, DateTime? UnmatchedAtUtc);
 
-/// <summary>Adapter contract owned by TV5. Must check blocks in both directions.</summary>
+/// <summary>Reports the direction of the block relative to the viewer.</summary>
 public interface IChatBlockPolicy
 {
-    Task<bool> CanInteractAsync(Guid firstUserId, Guid secondUserId,
+    Task<BlockDirection> GetDirectionAsync(Guid viewerId, Guid partnerId,
         CancellationToken cancellationToken = default);
 }
 
@@ -38,7 +39,7 @@ public sealed class UnconfiguredChatMatchAccess : IChatMatchAccess
 
 public sealed class UnconfiguredChatBlockPolicy : IChatBlockPolicy
 {
-    public Task<bool> CanInteractAsync(Guid firstUserId, Guid secondUserId,
+    public Task<BlockDirection> GetDirectionAsync(Guid viewerId, Guid partnerId,
         CancellationToken cancellationToken = default) =>
         throw new ChatDependencyUnavailableException("SafetyAdmin/TV5: IChatBlockPolicy (Guid)");
 }
@@ -85,9 +86,10 @@ public sealed class ChatPermissions(AppDbContext db, IChatMatchAccess matches, I
             .Where(x => (x.Id == matchLow || x.Id == matchHigh) && x.IsActive && x.EmailConfirmed &&
                 (x.LockoutEnd == null || x.LockoutEnd <= now))
             .CountAsync(cancellationToken) == 2;
-        var canInteract = await blocks.CanInteractAsync(matchLow, matchHigh, cancellationToken);
+        var partnerId = userId == matchLow ? matchHigh : matchLow;
+        var block = await blocks.GetDirectionAsync(userId, partnerId, cancellationToken);
         return ChatAccessRules.Evaluate(conversation.Id, userId, conversation.UserLowId,
-            conversation.UserHighId, match, participantsActive, canInteract);
+            conversation.UserHighId, match, participantsActive, block);
     }
 
     private static Guid Min(Guid a, Guid b) => a.CompareTo(b) < 0 ? a : b;
@@ -99,7 +101,7 @@ public static class ChatAccessRules
 {
     public static ConversationAccess Evaluate(Guid conversationId, Guid userId,
         Guid conversationLowId, Guid conversationHighId, ChatMatchSnapshot? match,
-        bool bothAccountsActive, bool canInteract)
+        bool bothAccountsActive, BlockDirection block)
     {
         if (conversationId == Guid.Empty || userId == Guid.Empty || match is null || match.Id == Guid.Empty)
             return ConversationAccess.Denied;
@@ -109,8 +111,10 @@ public static class ChatAccessRules
         var high = low == match.UserLowId ? match.UserHighId : match.UserLowId;
         if (conversationLowId != low || conversationHighId != high) return ConversationAccess.Denied;
         if (userId != low && userId != high) return ConversationAccess.Denied;
-        if (!bothAccountsActive || !canInteract) return ConversationAccess.Denied;
+        if (!bothAccountsActive || block.HasFlag(BlockDirection.Outgoing)) return ConversationAccess.Denied;
         var partnerId = userId == low ? high : low;
+        if (block == BlockDirection.Incoming)
+            return new ConversationAccess(false, false, partnerId, match.Id, BlockedByPartner: true);
         return new ConversationAccess(true, match.UnmatchedAtUtc is null, partnerId, match.Id);
     }
 }

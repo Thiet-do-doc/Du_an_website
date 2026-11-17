@@ -19,6 +19,6 @@ public sealed class IntegratedChatMatchAccess(AppDbContext db) : IChatMatchAcces
 
 public sealed class IntegratedChatBlockPolicy(IBlockPolicy blocks) : IChatBlockPolicy
 {
-    public Task<bool> CanInteractAsync(Guid firstUserId, Guid secondUserId, CancellationToken cancellationToken = default) =>
-        blocks.CanInteractAsync(firstUserId, secondUserId, cancellationToken);
+    public Task<BlockDirection> GetDirectionAsync(Guid viewerId, Guid partnerId, CancellationToken cancellationToken = default) =>
+        blocks.GetDirectionAsync(viewerId, partnerId, cancellationToken);
 }

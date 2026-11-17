@@ -13,6 +13,8 @@ public sealed record UpdateReportRequest(
     [Required] ReportStatus Status,
     [MaxLength(2000)] string? Notes);
 
+public sealed record HideReportedPostRequest([Required, MinLength(5), MaxLength(500)] string Reason);
+
 public sealed record UpdateUserStatusRequest(
     [property: System.Text.Json.Serialization.JsonRequired] bool IsActive,
     [Required, MinLength(5), MaxLength(500)] string Reason,

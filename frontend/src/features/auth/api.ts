@@ -14,6 +14,7 @@ async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const problem = await response.json().catch(() => ({}));
     if (response.status === 413) throw new ApiError(413, { title: 'Ảnh quá lớn. Hãy chọn ảnh nhỏ hơn.' });
+    if (response.status === 429) throw new ApiError(429, { title: 'Bạn thao tác quá nhanh. Hãy chờ khoảng một phút rồi thử lại.' });
     throw new ApiError(response.status, problem ?? {});
   }
   return response.status === 204 ? null as T : response.json();

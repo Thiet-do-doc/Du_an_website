@@ -3,7 +3,6 @@ export const memberTabs = [
   ['/discover', 'Khám phá', 'compass'],
   ['/chat', 'Trò chuyện', 'chat'],
   ['/notifications', 'Thông báo', 'bell'],
-  ['/wallet', 'Ví của tôi', 'cash'],
   ['/profile', 'Hồ sơ', 'profile'],
   ['/safety', 'An toàn', 'shield'],
 ] as const;
@@ -18,7 +17,7 @@ export function getVisibleTabs(isAdmin: boolean): readonly NavTab[] {
 
 export function isAppRoutePath(pathname: string): boolean {
   return memberTabs.some(([href]) => href === pathname)
-    || ['/register', '/login', '/account', '/blocks', '/gifts', '/admin'].includes(pathname);
+    || ['/register', '/login', '/account', '/blocks', '/gifts', '/wallet', '/admin'].includes(pathname);
 }
 
 export function resolveRouteDestination(

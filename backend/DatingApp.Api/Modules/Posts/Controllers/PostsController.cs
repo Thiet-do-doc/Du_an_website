@@ -34,7 +34,7 @@ public sealed class PostsController(AppDbContext db, ICurrentUser currentUser, N
     private IQueryable<Post> VisiblePosts()
     {
         var people = VisiblePeople();
-        return db.Set<Post>().AsNoTracking().Where(p => people.Contains(p.AuthorId));
+        return db.Set<Post>().AsNoTracking().Where(p => !p.IsHidden && people.Contains(p.AuthorId));
     }
 
     private IQueryable<PostResponse> Summaries(IQueryable<Post> posts)
@@ -75,11 +75,11 @@ public sealed class PostsController(AppDbContext db, ICurrentUser currentUser, N
         return photo is null ? NotFound() : File(photo.PhotoContent!, photo.PhotoType!);
     }
 
-    [HttpPost, Consumes("application/json")]
+    [HttpPost, Consumes("application/json"), Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("content-write")]
     public Task<IActionResult> Create(CreatePostRequest request, CancellationToken ct) =>
         SavePost(request.Content, request.Feeling, null, ct);
 
-    [HttpPost, Consumes("multipart/form-data"), RequestSizeLimit(6 * 1024 * 1024)]
+    [HttpPost, Consumes("multipart/form-data"), RequestSizeLimit(6 * 1024 * 1024), Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("content-write")]
     public Task<IActionResult> Upload([FromForm, StringLength(2000)] string? content,
         [FromForm, StringLength(32)] string? feeling, IFormFile? file, CancellationToken ct) =>
         SavePost(content, feeling, file, ct);
@@ -171,7 +171,7 @@ public sealed class PostsController(AppDbContext db, ICurrentUser currentUser, N
         return Ok(new { items = rows.Take(20), hasMore = rows.Count > 20 });
     }
 
-    [HttpPost("{id:guid}/comments")]
+    [HttpPost("{id:guid}/comments"), Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("content-write")]
     public async Task<IActionResult> Comment(Guid id, CreateCommentRequest request, CancellationToken ct)
     {
         var post = await VisiblePosts().SingleOrDefaultAsync(p => p.Id == id, ct);
@@ -230,6 +230,32 @@ public sealed class PostsController(AppDbContext db, ICurrentUser currentUser, N
     {
         var author = Viewer;
         var removed = await db.Set<Post>().Where(p => p.Id == id && p.AuthorId == author).ExecuteDeleteAsync(ct);
+        return removed == 0 ? NotFound() : NoContent();
+    }
+
+    [HttpPatch("{id:guid}"), Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("content-write")]
+    public async Task<IActionResult> Edit(Guid id, CreatePostRequest request, CancellationToken ct)
+    {
+        if (request.Feeling is not (null or "Vui vẻ" or "Hạnh phúc" or "Biết ơn" or "Hào hứng" or "Buồn" or "Bình yên"))
+            return BadRequest(new { message = "Cảm xúc không hợp lệ." });
+        var content = request.Content?.Trim() ?? "";
+        var post = await db.Set<Post>().SingleOrDefaultAsync(p => p.Id == id && p.AuthorId == Viewer && !p.IsHidden, ct);
+        if (post is null) return NotFound();
+        if (content.Length == 0 && request.Feeling is null && post.PhotoType is null)
+            return BadRequest(new { message = "Bài viết cần nội dung, cảm xúc hoặc ảnh." });
+        post.Content = content;
+        post.Feeling = request.Feeling;
+        await db.SaveChangesAsync(ct);
+        var updated = await Summaries(VisiblePosts().Where(p => p.Id == id)).SingleOrDefaultAsync(ct);
+        return updated is null ? NotFound() : Ok(updated);
+    }
+
+    [HttpDelete("{id:guid}/comments/{commentId:guid}")]
+    public async Task<IActionResult> DeleteComment(Guid id, Guid commentId, CancellationToken ct)
+    {
+        // Authors may remove their own comments even after a block or moderation action.
+        var removed = await db.Set<PostComment>().Where(c => c.Id == commentId && c.PostId == id && c.UserId == Viewer)
+            .ExecuteDeleteAsync(ct);
         return removed == 0 ? NotFound() : NoContent();
     }
 }

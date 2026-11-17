@@ -1,13 +1,16 @@
 using DatingApp.Api.Infrastructure.Data;
 using DatingApp.Api.Modules.Auth.Services;
+using DatingApp.Api.Modules.ChatNotifications.Hubs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 namespace DatingApp.Api.Modules.SafetyAdmin.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/v1/blocks")]
-public sealed class BlocksController(AppDbContext db, ICurrentUser currentUser) : ControllerBase
+public sealed class BlocksController(AppDbContext db, ICurrentUser currentUser, IHubContext<ChatHub> chatHub,
+    ILogger<BlocksController> logger) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken cancellationToken)
@@ -36,11 +39,12 @@ public sealed class BlocksController(AppDbContext db, ICurrentUser currentUser) 
             return BadRequest(new { message = "ID không hợp lệ hoặc bạn đang tự chặn mình." });
         if (!await db.Users.AnyAsync(x => x.Id == targetUserId, cancellationToken)) return NotFound();
         // Atomic repeat handling; other database errors remain visible.
-        await db.Database.ExecuteSqlInterpolatedAsync($"""
+        var changed = await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO user_blocks (blocker_user_id, blocked_user_id, created_at)
             VALUES ({actorId}, {targetUserId}, {DateTimeOffset.UtcNow})
             ON CONFLICT (blocker_user_id, blocked_user_id) DO NOTHING
             """, cancellationToken);
+        if (changed > 0) await RefreshConversationAccessAsync(actorId, targetUserId);
         return NoContent();
     }
     [HttpDelete("{targetUserId}")]
@@ -48,8 +52,26 @@ public sealed class BlocksController(AppDbContext db, ICurrentUser currentUser) 
     {
         if (currentUser.UserId is not Guid actorId) return Unauthorized();
         if (targetUserId == Guid.Empty || actorId == targetUserId) return BadRequest();
-        await db.Blocks.Where(x => x.BlockerUserId == actorId && x.BlockedUserId == targetUserId)
+        var changed = await db.Blocks.Where(x => x.BlockerUserId == actorId && x.BlockedUserId == targetUserId)
             .ExecuteDeleteAsync(cancellationToken);
+        if (changed > 0) await RefreshConversationAccessAsync(actorId, targetUserId);
         return NoContent();
+    }
+
+    private async Task RefreshConversationAccessAsync(Guid actorId, Guid targetUserId)
+    {
+        try
+        {
+            var hasConversation = await db.Conversations.AsNoTracking().AnyAsync(x =>
+                (x.UserLowId == actorId && x.UserHighId == targetUserId) ||
+                (x.UserLowId == targetUserId && x.UserHighId == actorId));
+            if (hasConversation)
+                await chatHub.Clients.Users(actorId.ToString(), targetUserId.ToString())
+                    .SendAsync("ConversationAccessChanged");
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Could not refresh conversation access after saving the block change.");
+        }
     }
 }

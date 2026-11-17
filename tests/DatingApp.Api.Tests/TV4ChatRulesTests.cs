@@ -1,4 +1,5 @@
 using DatingApp.Api.Modules.ChatNotifications.Services;
+using DatingApp.Api.Modules.SafetyAdmin.Services;
 using Xunit;
 
 namespace DatingApp.Tests;
@@ -44,7 +45,7 @@ public sealed class TV4ChatRulesTests
     public void AccessRules_ActiveMatchAllowsMemberToReadAndSend()
     {
         var (low, high, match, conversation) = Fixture();
-        var result = ChatAccessRules.Evaluate(conversation, low, low, high, match, true, true);
+        var result = ChatAccessRules.Evaluate(conversation, low, low, high, match, true, BlockDirection.None);
         Assert.True(result.CanRead);
         Assert.True(result.CanSend);
         Assert.Equal(high, result.PartnerId);
@@ -55,21 +56,34 @@ public sealed class TV4ChatRulesTests
     {
         var (low, high, match, conversation) = Fixture();
         match = match with { UnmatchedAtUtc = DateTime.UtcNow };
-        var result = ChatAccessRules.Evaluate(conversation, low, low, high, match, true, true);
+        var result = ChatAccessRules.Evaluate(conversation, low, low, high, match, true, BlockDirection.None);
         Assert.True(result.CanRead);
         Assert.False(result.CanSend);
     }
 
     [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    public void AccessRules_BlockOrInactiveAccountDeniesReadAndSend(bool active, bool canInteract)
+    [InlineData(false, BlockDirection.None)]
+    [InlineData(true, BlockDirection.Outgoing)]
+    [InlineData(true, BlockDirection.Outgoing | BlockDirection.Incoming)]
+    [InlineData(false, BlockDirection.Incoming)]
+    public void AccessRules_OwnBlockOrInactiveAccountHidesConversation(bool active, BlockDirection block)
     {
         var (low, high, match, conversation) = Fixture();
-        var result = ChatAccessRules.Evaluate(conversation, low, low, high, match, active, canInteract);
+        var result = ChatAccessRules.Evaluate(conversation, low, low, high, match, active, block);
         Assert.False(result.CanRead);
         Assert.False(result.CanSend);
+        Assert.False(result.BlockedByPartner);
+    }
+
+    [Fact]
+    public void AccessRules_BlockedViewerCanSeeStatusWithoutMessageAccess()
+    {
+        var (low, high, match, conversation) = Fixture();
+        var result = ChatAccessRules.Evaluate(conversation, high, low, high, match, true, BlockDirection.Incoming);
+        Assert.True(result.BlockedByPartner);
+        Assert.False(result.CanRead);
+        Assert.False(result.CanSend);
+        Assert.Equal(low, result.PartnerId);
     }
 
     [Fact]
@@ -77,9 +91,10 @@ public sealed class TV4ChatRulesTests
     {
         var (low, high, match, conversation) = Fixture();
         var outsider = Guid.NewGuid();
-        var result = ChatAccessRules.Evaluate(conversation, outsider, low, high, match, true, true);
+        var result = ChatAccessRules.Evaluate(conversation, outsider, low, high, match, true, BlockDirection.Incoming);
         Assert.False(result.CanRead);
         Assert.False(result.CanSend);
+        Assert.False(result.BlockedByPartner);
     }
 
     [Fact]
@@ -87,7 +102,7 @@ public sealed class TV4ChatRulesTests
     {
         var (low, high, match, conversation) = Fixture();
         var unrelated = Guid.NewGuid();
-        var result = ChatAccessRules.Evaluate(conversation, low, low, unrelated, match, true, true);
+        var result = ChatAccessRules.Evaluate(conversation, low, low, unrelated, match, true, BlockDirection.None);
         Assert.False(result.CanRead);
     }
 

@@ -43,7 +43,11 @@ public sealed class HealthEndpointTests
     private static WebApplicationFactory<Program> CreateFactory(bool ready, string status) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            builder.UseEnvironment("Testing");
+            builder.UseEnvironment("Testing")
+                // Health tests do not require the database stack.  Isolate them from a
+                // developer's connection-string environment variable so they remain
+                // valid in local runs and CI alike.
+                .UseSetting("ConnectionStrings:DefaultConnection", "");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IDatabaseProbe>();

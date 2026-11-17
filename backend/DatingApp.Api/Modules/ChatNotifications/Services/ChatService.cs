@@ -33,13 +33,15 @@ public sealed class ChatService(AppDbContext db, IChatPermissions permissions,
         foreach (var c in candidates)
         {
             var access = await permissions.GetAccessAsync(c.Id, userId, ct);
-            if (!access.CanRead) continue;
-            var last = await db.Messages.AsNoTracking().Where(x => x.ConversationId == c.Id)
-                .OrderByDescending(x => x.SentAt).ThenByDescending(x => x.Id)
-                .Select(x => MessageDto.From(x)).FirstOrDefaultAsync(ct);
+            if (!access.CanRead && !access.BlockedByPartner) continue;
+            var last = access.CanRead
+                ? await db.Messages.AsNoTracking().Where(x => x.ConversationId == c.Id)
+                    .OrderByDescending(x => x.SentAt).ThenByDescending(x => x.Id)
+                    .Select(x => MessageDto.From(x)).FirstOrDefaultAsync(ct)
+                : null;
             // Only public profile names are exposed; hidden profiles retain a neutral label.
             visible.Add(new ConversationDto(c.Id, c.MatchId, access.PartnerId,
-                partnerNames.GetValueOrDefault(access.PartnerId, "Người dùng"), c.CreatedAt, last, access.CanSend));
+                partnerNames.GetValueOrDefault(access.PartnerId, "Người dùng"), c.CreatedAt, last, access.CanSend, access.BlockedByPartner));
         }
         var items = visible.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
         return new ConversationPage(items, page, pageSize, visible.Count > page * pageSize);

@@ -284,13 +284,12 @@ export function ChatPage({ token, userId, getAccessToken }: Props) {
     }
     try {
       await reportMessage(token, item.id, reason.trim(), description.trim());
-      setFeedback(`Đã gửi báo cáo cho tin nhắn ${item.id}.`);
+      setFeedback('Đã gửi báo cáo tin nhắn. Nhóm kiểm duyệt sẽ xem xét.');
       setError('');
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      if (/HTTP 404|HTTP 501/.test(message)) {
-        setError(`Yêu cầu báo cáo đã gửi đúng messageId ${item.id}, nhưng API xử lý báo cáo Message của TV5 chưa được tích hợp (lỗi ${message.match(/HTTP (404|501)/)?.[1]}).`);
-      } else setError(message);
+      setError(e instanceof ApiError && e.status === 404
+        ? 'Tin nhắn không còn khả dụng để báo cáo. Hãy tải lại cuộc trò chuyện.' : message);
     }
   };
   useEffect(() => { setGiftOpen(false); setGiftError(''); }, [current, blockedByPartner]);

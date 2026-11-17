@@ -11,6 +11,7 @@ public sealed class Post
     public string? Feeling { get; set; }
     public byte[]? PhotoContent { get; set; }
     public string? PhotoType { get; set; }
+    public bool IsHidden { get; set; }
     public ICollection<PostLike> Likes { get; } = new List<PostLike>();
     public ICollection<PostComment> Comments { get; } = new List<PostComment>();
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;

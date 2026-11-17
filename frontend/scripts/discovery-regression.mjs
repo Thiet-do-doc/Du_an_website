@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 // Run against a local frontend server. API requests are mocked inside the browser.
 // Install Playwright or point PLAYWRIGHT_MODULE_URL to its module URL.
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE_URL ?? 'playwright');
+const playwright = await import(process.env.PLAYWRIGHT_MODULE_URL ?? 'playwright');
+const chromium = playwright.chromium ?? playwright.default?.chromium;
+if (!chromium) throw new Error('Không nạp được Chromium từ Playwright.');
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_EXECUTABLE });
 const origin = process.env.DISCOVERY_BASE_URL ?? 'http://127.0.0.1:5173';

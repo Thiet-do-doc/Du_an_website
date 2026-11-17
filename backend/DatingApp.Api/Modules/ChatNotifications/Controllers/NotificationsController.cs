@@ -37,4 +37,8 @@ public sealed class NotificationsController(NotificationService service, IChatPe
         try { return Ok(await service.MarkReadAsync(userId.Value, id, ct)); }
         catch (ChatDomainException e) { return Problem(statusCode: e.StatusCode, title: e.Message); }
     }
+
+    [HttpPatch("read-all")]
+    public async Task<IActionResult> ReadAll(CancellationToken ct) =>
+        Ok(new { updated = await service.MarkAllReadAsync(currentUser.UserId!.Value, ct) });
 }

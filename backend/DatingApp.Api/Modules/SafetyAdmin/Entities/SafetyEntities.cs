@@ -17,6 +17,10 @@ public sealed class UserReport
     public string? ReviewNotes { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? ReviewedAtUtc { get; set; }
+    public string? EvidenceContent { get; set; }
+    public string? EvidenceFeeling { get; set; }
+    public byte[]? EvidencePhoto { get; set; }
+    public string? EvidencePhotoType { get; set; }
 }
 
 public sealed class ModerationAction

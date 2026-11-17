@@ -12,7 +12,7 @@ const nav = await import('data:text/javascript;base64,' + Buffer.from(compiled).
 test('Admin sees all standard member tabs plus the report moderation tab', () => {
   const userHrefs = nav.getVisibleTabs(false).map(([href]) => href);
   const adminHrefs = nav.getVisibleTabs(true).map(([href]) => href);
-  assert.deepEqual(userHrefs, ['/', '/discover', '/chat', '/notifications', '/wallet', '/profile', '/safety']);
+  assert.deepEqual(userHrefs, ['/', '/discover', '/chat', '/notifications', '/profile', '/safety']);
   assert.deepEqual(adminHrefs, [...userHrefs, '/admin']);
 });
 
