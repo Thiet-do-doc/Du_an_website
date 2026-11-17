@@ -35,14 +35,14 @@ export function likeProfile(userId: string): Promise<LikeResult> {
 }
 
 export type ReceivedLike = { userId: string; displayName: string; photoUrl?: string | null };
-export const getReceivedLikes = () => request<ReceivedLike[]>('/api/v1/user-likes/received');
+export const getReceivedLikes = (signal?: AbortSignal) => request<ReceivedLike[]>('/api/v1/user-likes/received', { signal });
 
 export function passProfile(userId: string): Promise<void> {
   return request(`/api/v1/passes/${encodeURIComponent(userId)}`, { method: 'POST' });
 }
 
-export function getMatches(): Promise<MatchSummary[]> {
-  return request<Array<{ id: string; otherUserId: string; conversationId: string; matchedAt: string; isActive: boolean; otherProfile: { userId: string; displayName: string; age: number; city: string; occupation?: string | null; bio?: string | null; interests: string[]; photoUrl?: string | null; distanceKm?: number | null } }>>('/api/v1/matches').then(items => items.map(match => ({
+export function getMatches(signal?: AbortSignal): Promise<MatchSummary[]> {
+  return request<Array<{ id: string; otherUserId: string; conversationId: string; matchedAt: string; isActive: boolean; otherProfile: { userId: string; displayName: string; age: number; city: string; occupation?: string | null; bio?: string | null; interests: string[]; photoUrl?: string | null; distanceKm?: number | null } }>>('/api/v1/matches', { signal }).then(items => items.map(match => ({
     id: match.id,
     otherUserId: match.otherUserId,
     conversationId: match.conversationId,
