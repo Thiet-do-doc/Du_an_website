@@ -14,12 +14,16 @@ public sealed class PhotoService(AppDbContext db)
     {
         var image = await UploadedImage.ReadAsync(stream, contentType, ct);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        // Lock the profile before counting photos. Keep the count in a separate
+        // READ COMMITTED statement so a request that waited for this lock sees
+        // photos committed by the preceding upload.
         var profile = await db.Profiles.FromSqlInterpolated($"SELECT * FROM \"Profiles\" WHERE \"UserId\" = {userId} FOR UPDATE")
-            .Include(x => x.Photos).SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(ct);
         if (profile is null) throw new ProfileUnavailableException();
-        if (profile.Photos.Count >= MaxPhotos) throw new PhotoValidationException("Mỗi hồ sơ có tối đa 6 ảnh.");
+        var photoCount = await db.Photos.CountAsync(x => x.UserId == userId, ct);
+        if (photoCount >= MaxPhotos) throw new PhotoValidationException("Mỗi hồ sơ có tối đa 6 ảnh.");
         var photo = new Photo { UserId = userId, Profile = profile, Content = image.Content, ContentType = image.ContentType,
-            IsAvatar = profile.Photos.Count == 0, SortOrder = profile.Photos.Count };
+            IsAvatar = photoCount == 0, SortOrder = photoCount };
         db.Photos.Add(photo);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
